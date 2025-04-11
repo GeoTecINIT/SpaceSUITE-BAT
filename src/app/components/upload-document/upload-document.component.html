@@ -1,0 +1,14 @@
+<div class="flex flex-column flex-1 gap-4 my-2">
+  <p-fileupload mode="basic" chooseLabel="Upload File" chooseIcon="pi pi-upload" 
+                accept="application/pdf" (onSelect)="onFileSelected($event)" 
+                styleClass="justify-content-start custom-button"/>
+  <p-panel *ngIf="pdfDoc != null && !showProgressBar" header="File Data" class="custom-panel">
+    <p *ngIf="fileName" class="m-0">File Name: {{ fileName }}</p>
+    <p *ngIf="fileName" class="m-0">File Type: application/pdf</p>
+    <p *ngIf="fileSize" class="m-0">File Size: {{ fileSize }}</p>
+    <p *ngIf="pageCount" class="m-0">Page Count: {{ pageCount }}</p>
+  </p-panel>
+  <div *ngIf="showProgressBar">
+    <p-progressbar [value]="progress" class="custom-progress-bar"/>
+  </div>
+</div>

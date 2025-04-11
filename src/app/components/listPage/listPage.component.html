@@ -1,0 +1,49 @@
+<p-toast class="custom-toast" position="bottom-right"/>
+<p-confirmdialog />
+<div class="flex flex-column align-items-stretch p-4">
+    <h2 class="mx-auto">Annotated PDFs</h2>
+    <p-floatlabel variant="on" class="custom-floatlabel mx-auto mb-4">
+        <p-iconfield>
+          <p-inputicon class="pi pi-pencil" />
+          <input pInputText id="name" autocomplete="off" class="custom-input" 
+                [(ngModel)]="searchValue" (ngModelChange)="filterList()"/>
+          </p-iconfield>
+          <label for="name">Search Documents</label>
+      </p-floatlabel>
+    <div class="flex flex-column gap-4">
+        <p-card class="custom-color-card flex justify-content-center custom-card-padding" styleClass="flex-auto" [style]="{ 'max-width': '50rem', 'min-width': '20rem', height: 'auto'}" *ngFor="let document of filteredDocuments">
+            <ng-template #header>
+                <div class="flex justify-content-between gap-3" style="padding-left: 1.25rem; padding-right: 1.25rem; padding-top: 1.25rem;">
+                    <div class="flex align-items-center gap-2 min-w-0">
+                        <div class="p-card-title white-space-nowrap overflow-hidden text-overflow-ellipsis">{{document.name}}</div>
+                        <i class="p-1" [ngClass]="document.isPublic ? 'pi pi-lock-open' : 'pi pi-lock'"></i>
+                    </div>
+                    <div class="flex gap-1">
+                        <p-button class="flex pencil-button" variant="text" rounded="true" size="large" icon="pi pi-pencil" (click)="editDocumentAnnotation(document._id)"/>
+                        <p-button class="flex pencil-button" variant="text" rounded="true" size="large" icon="pi pi-download" (click)="downloadFile(document.url, document.name)"/>
+                        <p-button class="flex trash-button" variant="text" rounded="true" size="large" icon="pi pi-trash" (click)="deleteModal($event, document)"/>
+                    </div>
+                </div>
+                <div style="padding-left: 1.25rem; padding-right: 1.25rem; padding-top: 0.25rem;">
+                    <div class="flex">
+                        <strong>Organization:</strong><div class="ml-1">{{document.orgName}} - {{document.division}}</div>
+                    </div>
+                    <div class="flex">
+                        <strong>Knowledge:</strong><div class="ml-1">{{document.concepts.length}}</div>
+                    </div>
+                    <div class="flex justify-content-between">
+                        <div class="flex">
+                            <strong>Created:</strong><div class="font-italic ml-1">{{document.createdAt.toDate().toLocaleString()}}</div>
+                        </div>
+                        <a class="knowledge-link white-space-nowrap" (click)="showModal(document.name, document.description, document.concepts)">
+                            View detail
+                        </a>
+                    </div>
+                </div>
+            </ng-template>
+        </p-card>
+    </div>
+    <p class="m-0 mx-auto font-italic" *ngIf="documents.length == 0">No documents found</p>
+</div>
+
+<document-modal [(visible)]="viewModal" [name]="modalName" [description]="modalDescription" [concepts]="modalConcepts"></document-modal>

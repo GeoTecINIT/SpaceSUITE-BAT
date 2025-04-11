@@ -1,0 +1,32 @@
+:root {
+  --primary-color: #0e145d;
+  --secondary-color: #3fb3f8;
+  --hover-color: #f46524;
+  --danger-color: #ce3a41;
+  --warning-color: #ffd400;
+}
+
+body {
+  color: var(--primary-color);
+  font-family: "Poppins", sans-serif;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.custom-button {
+  --p-button-primary-background: var(--secondary-color);
+  --p-button-primary-border-color: var(--secondary-color);
+  --p-button-primary-hover-background: var(--hover-color);
+  --p-button-primary-hover-border-color: var(--hover-color);
+  --p-button-primary-active-background: color-mix(
+    in srgb,
+    var(--hover-color) 80%,
+    black 20%
+  );
+  --p-button-primary-active-border-color: color-mix(
+    in srgb,
+    var(--hover-color) 90%,
+    black 10%
+  );
+}

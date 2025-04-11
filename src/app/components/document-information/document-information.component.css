@@ -1,0 +1,40 @@
+.custom-input {
+  --p-inputtext-focus-border-color: var(--hover-color);
+  --p-inputtext-hover-border-color: var(--hover-color);
+}
+
+.custom-floatlabel {
+  --p-floatlabel-focus-color: var(--hover-color);
+}
+
+.textarea-iconfield {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.textarea-iconfield .p-inputicon {
+  position: absolute;
+  top: 17px;
+  left: 11px;
+  z-index: 1;
+}
+
+.custom-textarea {
+  padding-left: 2.5rem;
+}
+
+.custom-textarea:hover,
+.custom-textarea:focus {
+  border-color: var(--hover-color) !important;
+}
+
+.custom-textarea:disabled:hover,
+.custom-textarea:disabled:active {
+  border-color: var(--p-inputtext-border-color) !important;
+}
+
+.custom-select {
+  --p-select-hover-border-color: var(--hover-color);
+  --p-select-focus-border-color: var(--hover-color);
+}

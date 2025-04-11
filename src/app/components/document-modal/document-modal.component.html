@@ -1,0 +1,18 @@
+<p-dialog [modal]="true" [(visible)]="visible" (visibleChange)="visibleChange.emit(visible)" [style]="{ width: '50rem', color: 'var(--primary-color)' }" [breakpoints]="{ '1199px': '75vw', '575px': '90vw' }" [closable]="true">
+    <ng-template #header>
+        <div class="flex align-items-center gap-2 min-w-0">
+            <h3 class=" m-0 p-0 white-space-nowrap overflow-hidden text-overflow-ellipsis">{{name}}</h3>
+        </div>
+    </ng-template>
+    <h4 class="mt-0">Description</h4>
+    <p class="m-0" [ngClass]="description == '' ? 'font-italic' : ''">{{description == '' ? 'No description found' : description}}</p>
+    <p-divider />
+    <h4>knowledge ({{concepts.length}})</h4>
+    <div class="flex align-items-start gap-2 mt-2 flex-wrap">
+        <ng-container *ngFor="let concept of concepts">
+          <p-chip [label]="concept" [style.background]="getBackgroundColor(concept) | async" [style.color]="'var(--primary-color)'" 
+            [style]="{'--p-chip-remove-icon-color':'var(--primary-color)'}" class="lg:white-space-nowrap" />
+        </ng-container>
+        <p class="m-0 font-italic" *ngIf="concepts.length == 0">No knowledge found</p>
+    </div>
+</p-dialog>

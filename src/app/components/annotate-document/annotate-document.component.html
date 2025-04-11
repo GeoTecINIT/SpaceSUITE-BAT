@@ -1,0 +1,31 @@
+<div class="my-2">
+  <p class="m-0" *ngIf="bokConcepts.length === 0">
+    Search and add knowledge to start annotating the PDF
+  </p>
+
+  <div class="flex align-items-start gap-2 mt-2 mb-4 flex-wrap">
+    <ng-container *ngFor="let concept of bokConcepts">
+      <p-chip [label]="'[' + concept + '] ' + (getConceptName(concept) | async)" [removable]="true" [style.background]="getBackgroundColor(concept) | async" (onRemove)="deleteBokConcept(concept)" 
+      [style.color]="'var(--primary-color)'" [style]="{'--p-chip-remove-icon-color':'var(--primary-color)'}" class="lg:white-space-nowrap" />
+    </ng-container>
+  </div>
+
+  <div class="flex flex-wrap gap-2">
+    <p-button
+      class="custom-button"
+      (click)="addAnnotation()"
+      [disabled]="!isPdfAvailable"
+    >
+      Add annotation
+    </p-button>
+    <p-button
+      class="custom-button"
+      (click)="onClear()"
+      [disabled]="!isPdfAvailable || bokConcepts.length == 0"
+    >
+      Clear all
+    </p-button>
+  </div>
+  
+  <p *ngIf="message" style="color: var(--danger-color)">{{ message }}</p>
+</div>

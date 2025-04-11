@@ -1,0 +1,35 @@
+<div class="flex flex-column gap-4 my-2">
+  <div class="flex gap-4 sm:gap-2 flex-column-reverse sm:flex-row">
+    <p-floatlabel variant="on" class="custom-floatlabel flex-1">
+      <p-iconfield>
+        <p-inputicon class="pi pi-pencil" />
+        <input pInputText id="name" autocomplete="off" class="w-full custom-input" 
+              [(ngModel)]="formData.name" [disabled]="!logged || !isPdfAvailable" (ngModelChange)="updateDocumentForm()"/>
+        </p-iconfield>
+        <label for="name">Name*</label>
+    </p-floatlabel>
+    <p-selectbutton [options]="stateOptions" [(ngModel)]="formData.publicFile" optionLabel="label" optionValue="value" 
+                    [disabled]="!logged || !isPdfAvailable" (ngModelChange)="updateDocumentForm()"/>
+  </div>
+
+  <p-floatlabel variant="on" class="custom-floatlabel">
+      <p-iconfield class="textarea-iconfield">
+          <p-inputicon class="pi pi-align-justify"></p-inputicon>
+          <textarea id="description" rows="5" cols="30" pTextarea [(ngModel)]="formData.description" style="resize: none;" 
+                    class="w-full custom-textarea" [disabled]="!logged || !isPdfAvailable" (ngModelChange)="updateDocumentForm()"></textarea>
+      </p-iconfield>
+      <label for="description">Description</label>
+  </p-floatlabel>
+
+  <p-select [options]="organizations" [showClear]="true" [disabled]="!logged || !isPdfAvailable" [(ngModel)]="selectedOrganization" 
+            [optionLabel]="'name'" placeholder="Select an Organization*" class="w-full custom-select" [checkmark]="true" (ngModelChange)="updateDocumentForm()"/>
+  
+  <p-select [options]="organizationDivisions.get(selectedOrganization?._id ?? '') || []" [showClear]="true" [disabled]="!logged || !isPdfAvailable || selectedOrganization == null" [(ngModel)]="selectedDivision" 
+            placeholder="Select a Division*" class="w-full custom-select" [checkmark]="true" (ngModelChange)="updateDocumentForm()"/>
+  <div class="flex justify-content-between flex-wrap">
+    <p *ngIf="getValidationMessage()" class="text-sm m-0" style="color: var(--danger-color);">
+      {{ getValidationMessage() }}
+    </p>
+    <p class="text-sm m-0 xl:ml-auto">* Mandatory fields to save annotated PDF</p>
+  </div>
+</div>

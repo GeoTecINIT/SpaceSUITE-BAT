@@ -1,0 +1,51 @@
+.custom-acordion {
+    --p-accordion-header-color: color-mix(in srgb, var(--primary-color) 60%, rgba(255, 255, 255, 0) 40%);
+    --p-accordion-header-hover-color: var(--hover-color);
+    --p-accordion-header-active-color: var(--primary-color);
+    --p-accordion-content-color: var(--primary-color);
+}
+
+.responsive-wrapper {
+    max-width: calc(100vh * 0.85);
+}
+
+@media (max-width: 991px) {
+    .responsive-wrapper {
+        max-width: 100%;
+    }
+}
+
+.max-w-50rem {
+    max-width: 50rem;
+}
+
+.custom-toast {
+    --p-toast-info-background: color-mix(in srgb, var(--secondary-color) 10%, rgba(255, 255, 255, 0.9) 90%);
+    --p-toast-info-border-color: var(--secondary-color);
+    --p-toast-info-color: var(--secondary-color);
+    --p-toast-info-detail-color: var(--primary-color);
+
+    --p-toast-error-background: color-mix(in srgb, var(--danger-color) 10%, rgba(255, 255, 255, 0.9) 90%);
+    --p-toast-error-border-color: var(--danger-color);
+    --p-toast-error-color: var(--danger-color);
+    --p-toast-error-detail-color: var(--primary-color);
+
+    --p-toast-warn-background: color-mix(in srgb, var(--warning-color) 10%, rgba(255, 255, 255, 0.9) 90%);
+    --p-toast-warn-border-color: var(--warning-color);
+    --p-toast-warn-color: var(--warning-color);
+    --p-toast-warn-detail-color: var(--primary-color);
+}
+
+::ng-deep .p-toast-close-button .p-button-label {
+    font-size: 0;
+} 
+
+.docs-button {
+    --p-button-text-primary-color: var(--secondary-color);
+    --p-button-text-primary-hover-background: var(--p-button-text-secondary-hover-background);
+    --p-button-text-primary-active-background: var(--p-button-text-secondary-active-background);
+}
+
+.docs-button-hover:hover {
+    --p-button-text-primary-color: var(--hover-color);
+  }

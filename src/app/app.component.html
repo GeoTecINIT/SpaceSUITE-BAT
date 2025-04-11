@@ -1,0 +1,5 @@
+<div class="flex flex-column min-h-screen">
+    <header [toolName]="'BoK Annotation Tool'" [items]="headerItems" [login]="true" (profileClick)="redirectToProfile()" (organizationClick)="redirectToOrganizations()"></header>
+    <router-outlet></router-outlet>
+    <footer class="mt-auto"></footer>
+</div>
