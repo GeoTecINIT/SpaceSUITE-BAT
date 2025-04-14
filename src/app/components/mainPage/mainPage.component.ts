@@ -127,4 +127,17 @@ export class MainPageComponent {
   navigateToMyDocs() {
     this.router.navigate(['list'], { replaceUrl: true })
   }
+
+  onPdfDocChange(newDoc: PDFDocument | null) {
+    this.pdfDoc = newDoc;
+    if (newDoc) {
+      this.messageService.add({ 
+        severity: 'info', 
+        summary: 'Info', 
+        detail: `You uploaded a file without problems.`,
+        life: 3000, 
+        closable: true 
+      }); 
+    }
+  }
 }

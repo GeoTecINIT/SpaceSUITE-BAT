@@ -17,7 +17,7 @@
             
                 <p-accordion-panel value="2">
                     <p-accordion-header>Document Information</p-accordion-header>
-                    <p-accordion-content>
+                    <p-accordion-content [ngStyle]="{'overflow': 'visible'}">
                         <app-document-information [(formData)]="formContent" [isPdfAvailable]="pdfDoc != null" [logged]="logged"></app-document-information>
                     </p-accordion-content>
                 </p-accordion-panel>

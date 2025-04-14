@@ -25,15 +25,20 @@
                     </div>
                 </div>
                 <div style="padding-left: 1.25rem; padding-right: 1.25rem; padding-top: 0.25rem;">
-                    <div class="flex">
+                    <div class="flex flex-wrap">
                         <strong>Organization:</strong><div class="ml-1">{{document.orgName}} - {{document.division}}</div>
                     </div>
-                    <div class="flex">
+                    <div class="flex flex-wrap">
                         <strong>Knowledge:</strong><div class="ml-1">{{document.concepts.length}}</div>
                     </div>
-                    <div class="flex justify-content-between">
-                        <div class="flex">
-                            <strong>Created:</strong><div class="font-italic ml-1">{{document.createdAt.toDate().toLocaleString()}}</div>
+                    <div class="flex align-items-end justify-content-between">
+                        <div class="flex flex-wrap">
+                            <strong>
+                                {{isdocumentModified(document) ? 'Updated:' : 'Created:'}}
+                            </strong>
+                            <div class="font-italic ml-1">
+                                {{isdocumentModified(document) ? document.updatedAt.toDate().toLocaleString() : document.createdAt.toDate().toLocaleString()}}
+                            </div>
                         </div>
                         <a class="knowledge-link white-space-nowrap" (click)="showModal(document.name, document.description, document.concepts)">
                             View detail

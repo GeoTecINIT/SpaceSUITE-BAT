@@ -1,9 +1,9 @@
 <p-toast class="custom-toast" position="bottom-right"/>
 <div class="flex flex-wrap mx-2 lg:mx-7 max-h-full justify-content-between">
     <div class="flex-1 px-4 py-2 max-w-50rem min-w-full lg:min-w-0">
-        <div class="flex justify-content-between">
+        <div class="flex flex-wrap justify-content-between">
             <h2>New Annotation</h2>
-            <p-button class="docs-button m-3 mr-0" *ngIf="logged" variant="text" label="My Documents" 
+            <p-button class="docs-button m-3 mx-0" *ngIf="logged" variant="text" label="My Documents" 
                     icon="pi pi-file" (click)="navigateToMyDocs()" [disabled]="!logged" />
         </div>
         <div class="h-full flex flex-column">
@@ -11,7 +11,7 @@
                 <p-accordion-panel value="0">
                     <p-accordion-header>Upload File</p-accordion-header>
                     <p-accordion-content>
-                        <app-upload-document (pdfDocumentChange)="pdfDoc = $event" (documentDataChange)="formContent = $event" (conceptsChange)="bokRelations = $event"></app-upload-document>
+                        <app-upload-document (pdfDocumentChange)="onPdfDocChange($event)" (documentDataChange)="formContent = $event" (conceptsChange)="bokRelations = $event"></app-upload-document>
                     </p-accordion-content>
                 </p-accordion-panel>
             
@@ -24,7 +24,7 @@
             
                 <p-accordion-panel value="2">
                     <p-accordion-header>Document Information</p-accordion-header>
-                    <p-accordion-content>
+                    <p-accordion-content [ngStyle]="{'overflow': 'visible'}">
                         <app-document-information [(formData)]="formContent" [isPdfAvailable]="pdfDoc != null" [logged]="logged"></app-document-information>
                     </p-accordion-content>
                 </p-accordion-panel>

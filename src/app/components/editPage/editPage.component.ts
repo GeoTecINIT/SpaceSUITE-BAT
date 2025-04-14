@@ -113,7 +113,7 @@ export class EditPageComponent implements OnInit, OnDestroy {
       this.pdfDoc?.setTitle(this.formContent?.name + '_annotated');
       this.pdfDoc?.setSubject(relationsMetadata);
       let isSuccess = true;
-      this.storageService.updateDocument(this.pdfDoc, this.formContent, this.bokRelations, this.annotatedDocument.url, this.annotatedDocument._id).pipe(
+      this.storageService.updateDocument(this.pdfDoc, this.formContent, this.bokRelations, this.annotatedDocument).pipe(
         catchError((error) => {
           isSuccess = false;
           this.messageService.add({ 
