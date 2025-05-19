@@ -2,15 +2,19 @@ import { Component } from '@angular/core';
 import { HeaderComponent, FooterComponent } from '@eo4geo/ngx-bok-utils';
 import { MenuItem } from 'primeng/api';
 import { Router, RouterOutlet } from '@angular/router';
+import { ReleaseNotesComponent } from './components/releaseNotes/releaseNotes.component';
+import { PdfService } from './services/pdf.service';
 
 @Component({
   standalone: true,
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css'],
-  imports: [RouterOutlet, HeaderComponent, FooterComponent],
+  imports: [RouterOutlet, HeaderComponent, FooterComponent, ReleaseNotesComponent],
 })
 export class AppComponent {
+  releaseNotes: boolean = false;
+
   headerItems: MenuItem[] = [
     {
       label: 'Tools',
@@ -78,7 +82,7 @@ export class AppComponent {
     },
   ];
 
-  constructor(private router: Router) {}
+  constructor(private router: Router, private pdfService: PdfService) {}
 
   redirectToProfile() {
     this.router.navigate(['profile'], { replaceUrl: true });
@@ -86,5 +90,12 @@ export class AppComponent {
 
   redirectToOrganizations() {
     this.router.navigate(['organizations'], { replaceUrl: true });
+  }
+
+  openPdf() {
+    this.pdfService.getPdf().subscribe(pdfBlob => {
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, '_blank');
+    });
   }
 }
