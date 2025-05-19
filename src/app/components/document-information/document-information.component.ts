@@ -73,8 +73,8 @@ export class DocumentInformationComponent {
   getValidationMessage(): string | null {
     if (!this.logged) return 'Login to save the document';
     if (!this.isPdfAvailable) return 'Upload a file to save the document';
+    if (!this.formData.name || this.formData.name == '') return 'Type a name to save the document';
     if (this.selectedOrganization == null) return 'Select an Organization to save the document';
-    if (this.selectedDivision == '' || this.selectedDivision == null) return 'Select a Division to save the document';
     return null;
   }
 }

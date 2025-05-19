@@ -26,7 +26,12 @@
                 </div>
                 <div style="padding-left: 1.25rem; padding-right: 1.25rem; padding-top: 0.25rem;">
                     <div class="flex flex-wrap">
-                        <strong>Organization:</strong><div class="ml-1">{{document.orgName}} - {{document.division}}</div>
+                        <strong>Organization:</strong>
+                        <div class="ml-1">{{document.orgName}}</div>
+                        <ng-content *ngIf="document.division">
+                            <div class="ml-1">-</div>
+                            <div class="ml-1">{{document.division}}</div>
+                        </ng-content>
                     </div>
                     <div class="flex flex-wrap">
                         <strong>Knowledge:</strong><div class="ml-1">{{document.concepts.length}}</div>

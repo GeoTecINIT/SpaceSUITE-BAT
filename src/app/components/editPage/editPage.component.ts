@@ -134,6 +134,10 @@ export class EditPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  checkFormContent(): boolean {
+    return (this.formContent.name != '' && this.formContent.organization._id != '')
+  }
+
   updateFormContent(data: DocumentForm) {
     this.formContent = data;
   }

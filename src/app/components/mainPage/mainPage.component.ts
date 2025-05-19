@@ -106,7 +106,7 @@ export class MainPageComponent {
   }
 
   checkFormContent(): boolean {
-    return (this.formContent.name != '' && this.formContent.organization._id != '' && this.formContent.division != '')
+    return (this.formContent.name != '' && this.formContent.organization._id != '')
   }
 
   updateFormContent(data: DocumentForm) {
