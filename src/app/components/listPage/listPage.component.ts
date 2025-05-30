@@ -134,7 +134,7 @@ export class ListPageComponent implements OnInit, OnDestroy {
   }
 
   editDocumentAnnotation(documentId: string) {
-    this.router.navigate(['edit/' + documentId], { replaceUrl: true })
+    this.router.navigate(['edit/' + documentId])
   }
 
   isdocumentModified(document: AnnotatedDocument): boolean {

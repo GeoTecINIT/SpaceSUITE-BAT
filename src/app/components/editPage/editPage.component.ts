@@ -154,6 +154,6 @@ export class EditPageComponent implements OnInit, OnDestroy {
   }
 
   navigateToMyDocs() {
-    this.router.navigate(['list'], { replaceUrl: true })
+    this.router.navigate(['list'])
   }
 }

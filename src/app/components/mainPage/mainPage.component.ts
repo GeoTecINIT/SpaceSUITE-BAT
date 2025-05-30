@@ -125,7 +125,7 @@ export class MainPageComponent {
   }
 
   navigateToMyDocs() {
-    this.router.navigate(['list'], { replaceUrl: true })
+    this.router.navigate(['list'])
   }
 
   onPdfDocChange(newDoc: PDFDocument | null) {
