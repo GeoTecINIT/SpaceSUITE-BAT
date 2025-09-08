@@ -64,6 +64,11 @@ export class DocumentInformationComponent {
     }
   }
 
+  updateOrganization() {
+    this.selectedDivision = null;
+    this.updateDocumentForm();
+  }
+
   updateDocumentForm() {
     this.formData.organization = this.selectedOrganization ?? {_id: '', name: ''};
     this.formData.division = this.selectedDivision ?? '';
@@ -71,10 +76,10 @@ export class DocumentInformationComponent {
   }
 
   getValidationMessage(): string | null {
-    if (!this.logged) return 'Login to save the document';
-    if (!this.isPdfAvailable) return 'Upload a file to save the document';
-    if (!this.formData.name || this.formData.name == '') return 'Type a name to save the document';
-    if (this.selectedOrganization == null) return 'Select an Organization to save the document';
+    if (!this.logged) return 'Login to edit information and save your document';
+    if (!this.isPdfAvailable) return 'You need to upload a file before saving your document';
+    if (!this.formData.name?.trim()) return 'You need to enter a name to save your document';
+    if (!this.selectedOrganization) return 'You need to select an organization to save your document';
     return null;
   }
 }

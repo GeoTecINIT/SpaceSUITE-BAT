@@ -22,9 +22,9 @@
                     </p-accordion-content>
                 </p-accordion-panel>
             
-                <p-accordion-panel value="2">
+                <p-accordion-panel value="2" [disabled]="!logged">
                     <p-accordion-header>Document Information</p-accordion-header>
-                    <p-accordion-content [ngStyle]="{'overflow': 'visible'}">
+                    <p-accordion-content>
                         <app-document-information [(formData)]="formContent" [isPdfAvailable]="pdfDoc != null" [logged]="logged"></app-document-information>
                     </p-accordion-content>
                 </p-accordion-panel>
