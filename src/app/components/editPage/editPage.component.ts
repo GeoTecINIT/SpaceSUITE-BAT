@@ -41,6 +41,8 @@ export class EditPageComponent implements OnInit, OnDestroy {
   formContent: DocumentForm = new DocumentForm();
   bokRelations: string[] = [];
 
+  loading: boolean = false;
+
   private auth;
   private loggedSubscrition!: Subscription;
   private annotatedDocument: AnnotatedDocument = new AnnotatedDocument('','','','', '', '', '', false, '', '', '', [], 3, null, null, '');
@@ -113,6 +115,7 @@ export class EditPageComponent implements OnInit, OnDestroy {
       this.pdfDoc?.setTitle(this.formContent?.name + '_annotated');
       this.pdfDoc?.setSubject(relationsMetadata);
       let isSuccess = true;
+      this.loading = true;
       this.storageService.updateDocument(this.pdfDoc, this.formContent, this.bokRelations, this.annotatedDocument).pipe(
         catchError((error) => {
           isSuccess = false;
@@ -126,6 +129,7 @@ export class EditPageComponent implements OnInit, OnDestroy {
           return of(null);
         }),
         finalize(() => {
+          this.loading = false;
           if (isSuccess) {
             this.navigateToMyDocs()
           }

@@ -32,7 +32,7 @@
     
             <div class="flex flex-wrap gap-4 m-3">
                 <p-button class="custom-button" (click)="onDownload()" [disabled]="pdfDoc == null">Download</p-button>
-                <p-button class="custom-button" (click)="onSave()" [disabled]="pdfDoc == null || !logged || !checkFormContent()">Save</p-button>
+                <p-button class="custom-button" (click)="onSave()" [loading]="loading" [disabled]="pdfDoc == null || !logged || !checkFormContent()">Save</p-button>
             </div>
         </div>
     </div>

@@ -41,6 +41,8 @@ export class MainPageComponent {
   formContent: DocumentForm = new DocumentForm();
   bokRelations: string[] = [];
 
+  loading: boolean = false;
+
   private auth;
   private loggedSubscrition!: Subscription;
 
@@ -84,6 +86,7 @@ export class MainPageComponent {
       this.pdfDoc?.setTitle(this.formContent?.name + '_annotated');
       this.pdfDoc?.setSubject(relationsMetadata);
       let isSuccess = true;
+      this.loading = true;
       this.storageService.saveDocument(this.pdfDoc, this.formContent, this.bokRelations).pipe(
         catchError((error) => {
           isSuccess = false;
@@ -97,6 +100,7 @@ export class MainPageComponent {
           return of(null);
         }),
         finalize(() => {
+          this.loading = false;
           if (isSuccess) {
             this.navigateToMyDocs()
           }
