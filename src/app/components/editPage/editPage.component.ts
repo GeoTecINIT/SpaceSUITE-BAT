@@ -1,4 +1,4 @@
-import { Component, inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { BokComponent } from '@eo4geo/ngx-bok-visualization';
 import { AnnotateDocumentComponent } from '../annotate-document/annotate-document.component';
 import { PDFDocument } from 'pdf-lib';
@@ -13,9 +13,9 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from "primeng/api";
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { Auth, authState } from '@angular/fire/auth';
 import { StorageService } from '../../services/storage.service';
 import { AnnotatedDocument } from '../../model/annotatedDocument';
+import { AuthService } from '@eo4geo/ngx-bok-utils';
 
 @Component({
   standalone: true,
@@ -43,14 +43,14 @@ export class EditPageComponent implements OnInit, OnDestroy {
 
   loading: boolean = false;
 
-  private auth;
   private loggedSubscrition!: Subscription;
   private annotatedDocument: AnnotatedDocument = new AnnotatedDocument('','','','', '', '', '', false, '', '', '', [], 3, null, null, '');
 
-  constructor(private storageService: StorageService, private messageService: MessageService, private router: Router, private route: ActivatedRoute, private http: HttpClient) {
-    this.auth = inject(Auth);
-    this.loggedSubscrition = authState(this.auth).subscribe(user => {
-        this.logged = !!user;
+  constructor(private storageService: StorageService, private messageService: MessageService, private router: Router, 
+              private route: ActivatedRoute, private http: HttpClient, private authService: AuthService) {
+    this.loggedSubscrition = authService.getUserState().subscribe(state => {
+        this.logged = state?.logged || false;
+        if (!this.logged) this.router.navigate(['']);
     });
   }
 

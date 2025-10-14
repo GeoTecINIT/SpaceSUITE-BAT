@@ -1,31 +1,28 @@
 import { inject, Injectable } from '@angular/core';
-import { Auth, authState } from '@angular/fire/auth';
-import { collection, collectionData, CollectionReference, doc, docData, Firestore, or, query, where } from '@angular/fire/firestore';
-import { concatMap, map, Observable, of, tap } from 'rxjs';
+import { collection, collectionData, CollectionReference, doc, docData, Firestore } from '@angular/fire/firestore';
+import { AuthService } from '@eo4geo/ngx-bok-utils';
+import { concatMap, map, Observable, of } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
 })
 export class UserInformationService {
 
-  private auth;
   private db;
 
   private orgCollection: CollectionReference;
 
-  constructor() { 
-    this.auth = inject(Auth);
+  constructor(private authService: AuthService) { 
     this.db = inject(Firestore);
-
     this.orgCollection = collection(this.db, 'Organizations');
   }
 
   getUserOrganizationList(): Observable<{ _id: string, name: string }[]> {
     let uid = ''
-    return authState(this.auth).pipe(
-      concatMap(user => {
-        if (!user) return of([]);
-        uid = user.uid;
+    return this.authService.getUserState().pipe(
+      concatMap(state => {
+        if (!state?.logged) return of([]);
+        uid = state.uid;
         return collectionData(this.orgCollection) as Observable<{ _id: string, name: string, regular: string[], admin: string[] }[]>;
       }),
       map(organizations => 

@@ -16,6 +16,7 @@ import { catchError, finalize, of, Subscription } from 'rxjs';
 import { DocumentModalComponent } from "../document-modal/document-modal.component";
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { AuthService } from '@eo4geo/ngx-bok-utils';
 
 @Component({
   standalone: true,
@@ -35,22 +36,30 @@ export class ListPageComponent implements OnInit, OnDestroy {
   viewModal: boolean = false;
   modalName: string = '';
   modalDescription: string = '';
-  modalConcepts: string[] = []
+  modalConcepts: string[] = [];
+
+  loading = true;
 
   private documentsSubscription!: Subscription;
+  private authSubscription!: Subscription;
 
-  constructor(private storageService: StorageService, private messageService: MessageService, 
+  constructor(private storageService: StorageService, private messageService: MessageService, private authService: AuthService,
               private confirmationService: ConfirmationService, private http: HttpClient, private router: Router) {}
 
   ngOnInit(): void {
+    this.authSubscription = this.authService.getUserState().subscribe ( state => {
+      if (!state?.logged) this.router.navigate(['']);
+    });
     this.documentsSubscription = this.storageService.getAnnotatedDocuments().subscribe(newDocuments => {
       this.documents = newDocuments;
       this.filteredDocuments = this.documents;
+      this.loading = false;
     });
   }
 
   ngOnDestroy() {
     this.documentsSubscription.unsubscribe();
+    this.authSubscription.unsubscribe();
   }
 
   filterList() {

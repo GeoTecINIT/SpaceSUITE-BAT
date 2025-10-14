@@ -14,7 +14,7 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from "primeng/api";
 import { StorageService } from '../../services/storage.service';
 import { Router } from '@angular/router';
-import { Auth, authState } from '@angular/fire/auth';
+import { AuthService } from '@eo4geo/ngx-bok-utils';
 
 @Component({
   standalone: true,
@@ -43,13 +43,13 @@ export class MainPageComponent {
 
   loading: boolean = false;
 
-  private auth;
   private loggedSubscrition!: Subscription;
 
-  constructor(private storageService: StorageService, private messageService: MessageService, private router: Router) {
-    this.auth = inject(Auth);
-    this.loggedSubscrition = authState(this.auth).subscribe(user => {
-        this.logged = !!user;
+  constructor(private storageService: StorageService, private messageService: MessageService, private router: Router, private authService: AuthService) {}
+
+  ngOnInit() {
+    this.loggedSubscrition = this.authService.getUserState().subscribe(state => {
+        this.logged = state?.logged || false;
     });
   }
 
@@ -66,7 +66,7 @@ export class MainPageComponent {
 
       // stores the RDF format string holding BoK keys and relations
       this.pdfDoc?.setSubject(relationsMetadata);
-      const pdfBytes = await this.pdfDoc.save();
+      const pdfBytes = await this.pdfDoc.save()
 
       // set title and download pdf
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });

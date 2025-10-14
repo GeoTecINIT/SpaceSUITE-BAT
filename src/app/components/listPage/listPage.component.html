@@ -5,11 +5,11 @@
     <p-floatlabel variant="on" class="custom-floatlabel mx-auto mb-4">
         <p-iconfield>
           <p-inputicon class="pi pi-pencil" />
-          <input pInputText id="name" autocomplete="off" class="custom-input" 
+          <input pInputText id="name" autocomplete="off" class="custom-input" [disabled]="loading || documents.length == 0"
                 [(ngModel)]="searchValue" (ngModelChange)="filterList()"/>
-          </p-iconfield>
-          <label for="name">Search Documents</label>
-      </p-floatlabel>
+        </p-iconfield>
+        <label for="name">Search Documents</label>
+    </p-floatlabel>
     <div class="flex flex-column gap-4">
         <p-card class="custom-color-card flex justify-content-center custom-card-padding" styleClass="flex-auto" [style]="{ 'max-width': '50rem', 'min-width': '20rem', height: 'auto'}" *ngFor="let document of filteredDocuments">
             <ng-template #header>
@@ -53,7 +53,7 @@
             </ng-template>
         </p-card>
     </div>
-    <p class="m-0 mx-auto font-italic" *ngIf="documents.length == 0">No documents found</p>
+    <p class="m-0 mx-auto font-italic" *ngIf="!loading && documents.length == 0">No documents found</p>
 </div>
 
 <document-modal [(visible)]="viewModal" [name]="modalName" [description]="modalDescription" [concepts]="modalConcepts"></document-modal>

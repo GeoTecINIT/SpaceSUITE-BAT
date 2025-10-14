@@ -17,10 +17,10 @@ import { EditPageComponent } from './app/components/editPage/editPage.component'
 
 const routes: Routes = [
     { path: '', component: MainPageComponent },
-    { path: 'list', component: ListPageComponent, canActivate: [AuthGuard], runGuardsAndResolvers: 'always'},
-    { path: 'edit/:id', component: EditPageComponent, canActivate: [AuthGuard], runGuardsAndResolvers: 'always'},
-    { path: 'profile', component: UserPageComponent, canActivate: [AuthGuard], runGuardsAndResolvers: 'always'},
-    { path: 'organizations', component: OrganizationPageComponent, canActivate: [AuthGuard], runGuardsAndResolvers: 'always'},
+    { path: 'list', component: ListPageComponent, canMatch: [AuthGuard]},
+    { path: 'edit/:id', component: EditPageComponent, canMatch: [AuthGuard]},
+    { path: 'profile', component: UserPageComponent, canMatch: [AuthGuard]},
+    { path: 'organizations', component: OrganizationPageComponent, canMatch: [AuthGuard]},
     { path: '**', component: NotFoundPageComponent}
 ];
 

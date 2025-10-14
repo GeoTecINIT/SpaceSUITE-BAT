@@ -1,5 +1,4 @@
 import { inject, Injectable } from '@angular/core';
-import { Auth, authState } from '@angular/fire/auth';
 import { collection, collectionData, CollectionReference, deleteDoc, doc, docData, FieldValue, Firestore, query, serverTimestamp, setDoc, where } from '@angular/fire/firestore';
 import { deleteObject, getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
 import { catchError, concatMap, forkJoin, from, map, Observable, of, take, throwError } from 'rxjs';
@@ -7,13 +6,13 @@ import { AnnotatedDocument } from '../model/annotatedDocument';
 import { PDFDocument } from 'pdf-lib';
 import { DocumentForm } from '../model/documentForm';
 import { BokInformationService } from '@eo4geo/ngx-bok-visualization';
+import { AuthService } from '@eo4geo/ngx-bok-utils';
 
 @Injectable({
   providedIn: 'root',
 })
 export class StorageService {
 
-  private auth;
   private db;
   private storage;
 
@@ -21,14 +20,13 @@ export class StorageService {
 
   private userId: string = '';
 
-  constructor(private bokInfoService: BokInformationService) { 
-    this.auth = inject(Auth);
+  constructor(private bokInfoService: BokInformationService, private authService: AuthService) { 
     this.db = inject(Firestore);
     this.storage = inject(Storage)
 
     this.docsCollection = collection(this.db, 'Other');
 
-    authState(this.auth).subscribe(user => this.userId = user?.uid ?? '');
+    this.authService.getUserState().subscribe(state => this.userId = state?.uid || '');
   }
 
   saveDocument(file: PDFDocument, data: DocumentForm, concepts: string[]): Observable<void> {
@@ -87,10 +85,10 @@ export class StorageService {
   }
 
   getAnnotatedDocuments(): Observable<AnnotatedDocument[]> {
-    return authState(this.auth).pipe(
-      concatMap(user => {
-        if (user) {
-          const selfDocsQuery = query(this.docsCollection, where('userId', '==', user.uid));
+    return this.authService.getUserState().pipe(
+      concatMap(state => {
+        if (state?.logged) {
+          const selfDocsQuery = query(this.docsCollection, where('userId', '==', state.uid));
           return collectionData(selfDocsQuery) as Observable<AnnotatedDocument[]>;
         }
         return of([]);
