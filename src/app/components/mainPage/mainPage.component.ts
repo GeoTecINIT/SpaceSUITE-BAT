@@ -5,7 +5,7 @@ import { AnnotateDocumentComponent } from '../annotate-document/annotate-documen
 import { PDFDocument } from 'pdf-lib';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { catchError, finalize, of, Subscription } from 'rxjs';
+import { catchError, finalize, of, Subscription, timer } from 'rxjs';
 import { AccordionModule } from 'primeng/accordion';
 import { ButtonModule } from 'primeng/button';
 import { DividerModule } from 'primeng/divider';
@@ -19,6 +19,7 @@ import { AuthService } from '@eo4geo/ngx-bok-utils';
 import { InputTextModule } from 'primeng/inputtext';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { ProgressBarModule } from 'primeng/progressbar';
+import { PanelModule } from 'primeng/panel';
 import { SliderModule } from 'primeng/slider';
 import { BokMatchingService, BokClassificationResult, BokMatch } from '../../services/bok-matching.service';
 import { PdfTextExtractorService, PdfTextExtractionResult } from '../../services/pdf-text-extractor.service';
@@ -42,6 +43,7 @@ import { PdfTextExtractorService, PdfTextExtractionResult } from '../../services
     InputTextModule,
     ProgressSpinnerModule,
     ProgressBarModule,
+    PanelModule,
     SliderModule
   ],
   providers: [MessageService]
@@ -71,6 +73,7 @@ export class MainPageComponent implements OnInit, OnDestroy {
   extractionProgress: { current: number; total: number } | null = null;
   isExtracting: boolean = false;
   extractedText: PdfTextExtractionResult | null = null;
+  private extractionAbortController: AbortController | null = null;
 
   private loggedSubscrition!: Subscription;
   private processingSubscription!: Subscription;
@@ -116,12 +119,6 @@ export class MainPageComponent implements OnInit, OnDestroy {
       const conceptCount = await this.bokMatchingService.loadBokDataFromUrl('assets/bok-embeddings.json');
       this.bokDataLoaded = true;
       this.matcherReady = true;
-      this.messageService.add({
-        severity: 'success',
-        summary: 'BoK Data Loaded',
-        detail: `Loaded ${conceptCount} BoK concepts`,
-        life: 3000
-      });
     } catch (error) {
       console.error('Failed to load BoK data:', error);
       this.bokDataLoaded = false;
@@ -193,6 +190,9 @@ export class MainPageComponent implements OnInit, OnDestroy {
       this.matcherReady = false;
       this.isExtracting = true;
       this.extractionProgress = { current: 0, total: 0 };
+      
+      // Create abort controller for this operation
+      this.extractionAbortController = new AbortController();
 
       // Extract text from PDF
       this.messageService.add({
@@ -206,11 +206,19 @@ export class MainPageComponent implements OnInit, OnDestroy {
         this.pdfArrayBuffer,
         (current, total) => {
           this.extractionProgress = { current, total };
-        }
+        },
+        this.extractionAbortController.signal
       );
 
-      this.isExtracting = false;
-      this.extractionProgress = null;
+      // Add delay to allow progress bar to visually show 100% before hiding
+      await new Promise<void>(resolve => {
+        timer(1500).subscribe(() => {
+          this.isExtracting = false;
+          this.extractionProgress = null;
+          this.extractionAbortController = null;
+          resolve();
+        });
+      });
 
       if (this.extractedText.pages.length === 0 || !this.extractedText.allText.trim()) {
         this.messageService.add({
@@ -270,19 +278,32 @@ export class MainPageComponent implements OnInit, OnDestroy {
       console.error('PDF classification error:', error);
       this.isExtracting = false;
       this.extractionProgress = null;
+      this.extractionAbortController = null;
       this.matcherReady = true;
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Classification Error',
-        detail: error instanceof Error ? error.message : 'Unknown error occurred',
-        life: 5000
-      });
+      
+      // Don't show error message if operation was aborted
+      if (error instanceof Error && error.name === 'AbortError') {
+        this.messageService.add({
+          severity: 'info',
+          summary: 'Operation Cancelled',
+          detail: 'PDF analysis was cancelled.',
+          life: 3000
+        });
+      } else {
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Classification Error',
+          detail: error instanceof Error ? error.message : 'Unknown error occurred',
+          life: 5000
+        });
+      }
     }
   }
 
   // Get extraction progress percentage
   getExtractionProgressPercentage(): number {
     if (!this.extractionProgress || this.extractionProgress.total === 0) return 0;
+    if (this.extractionProgress.current >= this.extractionProgress.total) return 100;
     return Math.round((this.extractionProgress.current / this.extractionProgress.total) * 100);
   }
 
@@ -359,7 +380,8 @@ export class MainPageComponent implements OnInit, OnDestroy {
 
   // Get progress percentage for the progress bar
   getProgressPercentage(): number {
-    if (!this.processingProgress) return 0;
+    if (!this.processingProgress || this.processingProgress.total === 0) return 0;
+    if (this.processingProgress.current >= this.processingProgress.total) return 100;
     return Math.round((this.processingProgress.current / this.processingProgress.total) * 100);
   }
 
@@ -439,6 +461,9 @@ export class MainPageComponent implements OnInit, OnDestroy {
   }
 
   onPdfDocChange(newDoc: PDFDocument | null) {
+    // Cancel any ongoing operations
+    this.cancelOngoingOperations();
+    
     this.pdfDoc = newDoc;
     this.extractedText = null;
     this.bokMatchingResult = null;
@@ -458,6 +483,28 @@ export class MainPageComponent implements OnInit, OnDestroy {
       }); 
     } else {
       this.pdfArrayBuffer = null;
+    }
+  }
+
+  private cancelOngoingOperations(): void {
+    // Cancel text extraction if in progress
+    if (this.isExtracting && this.extractionAbortController) {
+      this.extractionAbortController.abort();
+      this.extractionAbortController = null;
+      this.isExtracting = false;
+      this.extractionProgress = null;
+    }
+    
+    // Cancel AI processing if in progress
+    if (this.isProcessing) {
+      this.bokMatchingService.terminateWorker();
+      this.isProcessing = false;
+      this.processingProgress = null;
+      this.matcherReady = null; // Set to null to show loading state
+      this.bokDataLoaded = false; // Reset BoK data loaded state
+      
+      // Reload BoK data after terminating worker
+      this.loadBokData();
     }
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, timer } from 'rxjs';
 
 export interface BokMatch {
   conceptId: string;
@@ -174,7 +174,10 @@ export class BokMatchingService implements OnDestroy {
           case 'complete':
             this._isModelLoading.next(false);
             this._loadingProgress.next(null);
-            this._processingProgress.next(null);
+            // Add delay to allow progress bar to visually show 100% before hiding
+            timer(1500).subscribe(() => {
+              this._processingProgress.next(null);
+            });
             this.worker?.removeEventListener('message', messageHandler);
             resolve(output);
             break;

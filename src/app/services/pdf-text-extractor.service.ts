@@ -27,17 +27,28 @@ export class PdfTextExtractorService {
    * Extract text from a PDF file provided as ArrayBuffer
    * @param pdfData ArrayBuffer containing the PDF data
    * @param onProgress Optional callback for progress updates
+   * @param abortSignal Optional AbortSignal for cancellation
    * @returns Promise with extracted text by page
    */
   async extractTextFromArrayBuffer(
     pdfData: ArrayBuffer,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
+    abortSignal?: AbortSignal
   ): Promise<PdfTextExtractionResult> {
-    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+    // pdf.js transfers the provided ArrayBuffer to its own worker, which detaches it.
+    // Clone first so callers can reuse the original buffer for repeated analyses.
+    const dataForPdfJs = pdfData.slice(0);
+
+    const pdf = await pdfjsLib.getDocument({ data: dataForPdfJs }).promise;
     const totalPages = pdf.numPages;
     const pages: PageText[] = [];
 
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      // Check for abort signal
+      if (abortSignal?.aborted) {
+        throw new DOMException('Operation was aborted', 'AbortError');
+      }
+      
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
       

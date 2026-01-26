@@ -200,31 +200,37 @@ self.addEventListener('message', async (event) => {
                     // Sort by similarity descending
                     selectedMatches.sort((a, b) => b.similarity - a.similarity);
 
-                    self.postMessage({
-                        status: 'complete',
-                        output: {
-                            allMatchedIds: uniqueIds,
-                            selectedIds: selectedIds,
-                            matches: selectedMatches,
-                            percentileThreshold: thresholdValue,
-                            topPercentile: topPercentile,
-                            totalMatches: allMatches.length,
-                            selectedMatches: selectedMatches.length
-                        }
-                    });
+                    // Add delay to allow progress bar to visually show 100% before completing
+                    setTimeout(() => {
+                        self.postMessage({
+                            status: 'complete',
+                            output: {
+                                allMatchedIds: uniqueIds,
+                                selectedIds: selectedIds,
+                                matches: selectedMatches,
+                                percentileThreshold: thresholdValue,
+                                topPercentile: topPercentile,
+                                totalMatches: allMatches.length,
+                                selectedMatches: selectedMatches.length
+                            }
+                        });
+                    }, 1500);
                 } else {
-                    self.postMessage({
-                        status: 'complete',
-                        output: {
-                            allMatchedIds: [],
-                            selectedIds: [],
-                            matches: [],
-                            percentileThreshold: null,
-                            topPercentile: topPercentile,
-                            totalMatches: 0,
-                            selectedMatches: 0
-                        }
-                    });
+                    // Add delay to allow progress bar to visually show 100% before completing
+                    setTimeout(() => {
+                        self.postMessage({
+                            status: 'complete',
+                            output: {
+                                allMatchedIds: [],
+                                selectedIds: [],
+                                matches: [],
+                                percentileThreshold: null,
+                                topPercentile: topPercentile,
+                                totalMatches: 0,
+                                selectedMatches: 0
+                            }
+                        });
+                    }, 1500);
                 }
                 break;
 
