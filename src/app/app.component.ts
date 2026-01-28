@@ -51,6 +51,12 @@ export class AppComponent {
           target: '_blank'
         },
         {
+          label: 'Skill Portfolio',
+          icon: 'pi pi-user',
+          url: 'https://spacesuite-project-spt.web.app',
+          target: '_blank'
+        },
+        {
           label: 'BoK Annotation Tool',
           icon: 'pi pi-pencil',
           style: {'--p-tieredmenu-item-color': 'var(--hover-color)'},
