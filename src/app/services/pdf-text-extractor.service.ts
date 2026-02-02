@@ -154,7 +154,6 @@ export class PdfTextExtractorService {
 
   /**
    * Split text into meaningful blocks for processing
-   * Uses larger blocks (1500 chars) for more efficient processing with fewer API calls
    * @param pages Array of page texts
    * @param maxBlockLength Maximum length of each text block (default: 1500)
    * @returns Array of text blocks with their page numbers

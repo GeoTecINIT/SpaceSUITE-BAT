@@ -50,10 +50,6 @@
     --p-button-text-primary-color: var(--hover-color);
 }
 
-.custom-progress-bar {
-  --p-progressbar-value-background: var(--secondary-color);
-}
-
 .custom-panel {
   --p-panel-color: var(--primary-color);
   --p-panel-header-color: var(--primary-color); 

@@ -111,8 +111,8 @@ self.addEventListener('message', async (event) => {
                 self.postMessage({ status: 'ready' });
 
                 const textBlocks: string[] = data.textBlocks;
-                const similarityThreshold: number = data.threshold || 0.8;
-                const topPercentile: number = data.topPercentile || 0.95;
+                const similarityThreshold: number = data.threshold ?? 0.8;
+                const topPercentile: number = data.topPercentile ?? 0.95;
 
                 // Map to track best match per concept (deduplication)
                 const bestMatchPerConcept: Map<string, {
@@ -157,7 +157,7 @@ self.addEventListener('message', async (event) => {
                             // Only keep the match with highest similarity for each concept
                             if (!existingMatch || sim > existingMatch.similarity) {
                                 // Extract a representative sentence from the text block
-                                const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 20);
+                                const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 100);
                                 const matchingSentence = sentences.length > 0 
                                     ? sentences[0].substring(0, 150) + (sentences[0].length > 150 ? '...' : '')
                                     : text.substring(0, 150) + (text.length > 150 ? '...' : '');
