@@ -5,6 +5,7 @@ import { Subscription } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { PanelModule } from 'primeng/panel';
+import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
 import { PDFDocument } from 'pdf-lib';
 import { BokMatchingService, BokClassificationResult } from '../../services/bok-matching.service';
@@ -15,7 +16,7 @@ type Progress = { current: number; total: number } | null;
 @Component({
   selector: 'app-ai-bok-matching',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, ProgressBarModule, PanelModule],
+  imports: [CommonModule, FormsModule, ButtonModule, ProgressBarModule, PanelModule, TooltipModule],
   templateUrl: './ai-bok-matching.component.html',
   styleUrls: ['./ai-bok-matching.component.css']
 })
@@ -78,6 +79,7 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy {
         this.pdfArrayBuffer,
         (current, total) => this.extractionProgress = { current, total }
       );
+      // Ensure progress bar shows 100% before hiding
       await this.delay(1500);
       this.extractionProgress = null;
 
@@ -91,6 +93,10 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy {
       this.bokMatchingResult = await this.bokMatchingService.classifyText(
         textBlocks, this.similarityThreshold, this.topPercentile / 100, pageNumbers
       );
+      // Ensure processing progress bar shows 100% before hiding
+      await this.delay(1500);
+      this.processingProgress = null;
+      
       this.selectedConcepts.clear();
 
       const { selectedIds } = this.bokMatchingResult;

@@ -4,6 +4,10 @@ import { pipeline, PipelineType, ProgressCallback } from "@huggingface/transform
 class PipelineSingleton {
     static task: PipelineType = 'feature-extraction';
     static model = 'TaylorAI/bge-micro-v2';
+    // Alternatives:
+    // TaylorAI/bge-micro-v2: 384-dim, smaller model, faster but less accurate
+    //
+
     static instance: any = null;
 
     static async getInstance(progress_callback?: ProgressCallback) {

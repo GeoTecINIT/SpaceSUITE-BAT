@@ -1,3 +1,8 @@
+.blue-border-round {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+}
 .custom-progress-bar {
   --p-progressbar-value-background: var(--secondary-color);
 }
