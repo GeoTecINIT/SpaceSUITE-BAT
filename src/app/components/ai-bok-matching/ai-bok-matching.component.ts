@@ -34,11 +34,15 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
   processingProgress: Progress = null;
   isProcessing = false;
   extractionProgress: Progress = null;
+  // Flag to track if analysis is in progress (covers entire process)
+  isAnalyzing = false;
 
   // Store raw match data for dynamic filtering
   private rawMatchData: BokRawClassificationResult | null = null;
   // Flag to track if analysis was cancelled
   private isCancelled = false;
+  // AbortController for PDF extraction cancellation
+  private extractionAbortController: AbortController | null = null;
 
   private subscriptions: Subscription[] = [];
 
@@ -81,10 +85,14 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
 
   cancelAnalysis(): void {
     this.isCancelled = true;
+    // Abort PDF extraction if in progress
+    this.extractionAbortController?.abort();
+    this.extractionAbortController = null;
     this.bokMatchingService.cancelProcessing();
     this.extractionProgress = null;
     this.processingProgress = null;
     this.isProcessing = false;
+    this.isAnalyzing = false;
     this.bokDataLoaded = false;
     this.showMessage('info', 'Cancelled', 'PDF analysis was cancelled.');
     // Reload BoK data for next analysis
@@ -99,24 +107,41 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
     try {
       // Reset cancellation flag at start of new analysis
       this.isCancelled = false;
+      this.isAnalyzing = true;
+      // Create new AbortController for this extraction
+      this.extractionAbortController = new AbortController();
       this.bokMatchingResult = null;
       this.extractionProgress = { current: 0, total: 0 };
       this.showMessage('info', 'Extracting Text', 'Extracting text from PDF...');
 
       const extracted = await this.pdfTextExtractor.extractTextFromArrayBuffer(
         this.pdfArrayBuffer,
-        (current, total) => this.extractionProgress = { current, total }
+        (current, total) => {
+          // Don't update progress if cancelled
+          if (!this.isCancelled) {
+            this.extractionProgress = { current, total };
+          }
+        },
+        this.extractionAbortController.signal
       );
+      this.extractionAbortController = null;
+      
+      // Check if cancelled immediately after extraction
+      if (this.isCancelled) {
+        return;
+      }
+      
       // Ensure progress bar shows 100% before hiding
       await this.delay(1500);
       this.extractionProgress = null;
 
-      // Check if cancelled during extraction
+      // Check again if cancelled during delay
       if (this.isCancelled) {
         return;
       }
 
       if (!extracted.pages.length || !extracted.allText.trim()) {
+        this.isAnalyzing = false;
         return this.showMessage('error', 'No Text Found', 'Could not extract text. The PDF might be image-based.');
       }
 
@@ -151,9 +176,15 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
         ? `Found ${selectedIds.length} concepts (${selectedIds.filter(id => !this.bokRelations.includes(id)).length} new)`
         : 'No matching concepts found above threshold.';
       this.showMessage(selectedIds.length ? 'info' : 'info', 'Analysis Complete', msg);
+      this.isAnalyzing = false;
     } catch (error) {
+      // Don't show error if cancelled (AbortError)
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
       console.error('PDF classification error:', error);
       this.extractionProgress = null;
+      this.isAnalyzing = false;
       this.showMessage('error', 'Error', error instanceof Error ? error.message : 'Unknown error');
     }
   }

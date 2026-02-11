@@ -40,9 +40,9 @@
     <!-- Analyze Button -->
     <div class="flex gap-2">
         <p-button label="Analyze PDF Content" icon="pi pi-search" (click)="classifyPdfContent()"
-            [disabled]="!bokDataLoaded || !pdfDoc || isProcessing || isExtracting"
+            [disabled]="!bokDataLoaded || !pdfDoc || isAnalyzing"
             [loading]="isExtracting || isProcessing" class="flex-1 custom-button" size="large"/>
-        <p-button *ngIf="isExtracting || isProcessing" label="Cancel" icon="pi pi-times" severity="danger"
+        <p-button *ngIf="isAnalyzing" label="Cancel" icon="pi pi-times" severity="danger"
             (click)="cancelAnalysis()" size="large"/>
     </div>
 
