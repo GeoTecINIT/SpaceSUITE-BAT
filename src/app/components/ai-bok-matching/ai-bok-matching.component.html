@@ -19,7 +19,7 @@
                 Similarity Threshold: {{ similarityThreshold }}
                 <span class="text-500 font-normal ml-2">(minimum similarity)</span>
             </label>
-            <input type="range" min="0.5" max="0.95" step="0.01" [(ngModel)]="similarityThreshold" class="w-full"/>
+            <input type="range" min="0.5" max="0.95" step="0.01" [(ngModel)]="similarityThreshold" (ngModelChange)="onFilterChange()" class="w-full"/>
             <div class="flex justify-content-between text-xs text-500">
                 <span>0.5 (Less confident)</span><span>0.95 (More confident)</span>
             </div>
@@ -30,7 +30,7 @@
                 Top Percentile: {{ topPercentile }}%
                 <span class="text-500 font-normal ml-2">(select top {{ 100 - topPercentile }}%)</span>
             </label>
-            <input type="range" min="0" max="99" step="1" [(ngModel)]="topPercentile" class="w-full"/>
+            <input type="range" min="0" max="99" step="1" [(ngModel)]="topPercentile" (ngModelChange)="onFilterChange()" class="w-full"/>
             <div class="flex justify-content-between text-xs text-500">
                 <span>0% (Top 100%)</span><span>99% (Top 1%)</span>
             </div>
@@ -38,9 +38,13 @@
     </div>
 
     <!-- Analyze Button -->
-    <p-button label="Analyze PDF Content" icon="pi pi-search" (click)="classifyPdfContent()"
-        [disabled]="!bokDataLoaded || !pdfDoc || isProcessing || isExtracting"
-        [loading]="isExtracting || isProcessing" class="w-full custom-button" size="large"/>
+    <div class="flex gap-2">
+        <p-button label="Analyze PDF Content" icon="pi pi-search" (click)="classifyPdfContent()"
+            [disabled]="!bokDataLoaded || !pdfDoc || isProcessing || isExtracting"
+            [loading]="isExtracting || isProcessing" class="flex-1 custom-button" size="large"/>
+        <p-button *ngIf="isExtracting || isProcessing" label="Cancel" icon="pi pi-times" severity="danger"
+            (click)="cancelAnalysis()" size="large"/>
+    </div>
 
     <!-- Extraction Progress -->
     <ng-container *ngIf="extractionProgress">

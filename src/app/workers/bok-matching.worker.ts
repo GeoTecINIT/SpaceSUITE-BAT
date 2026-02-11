@@ -5,8 +5,8 @@ class PipelineSingleton {
     static task: PipelineType = 'feature-extraction';
     static model = 'TaylorAI/bge-micro-v2';
     // Alternatives:
-    // TaylorAI/bge-micro-v2: 384-dim, smaller model, faster but less accurate
-    //
+    // TaylorAI/bge-micro-v2: 384-dim, smaller model, faster but less accurate (20ms/block))
+    // onnx-community/embeddinggemma-300m-ONNX: 1024-dim, larger model, more accurate but slower (1s/block!)
 
     static instance: any = null;
 
@@ -115,8 +115,8 @@ self.addEventListener('message', async (event) => {
                 self.postMessage({ status: 'ready' });
 
                 const textBlocks: string[] = data.textBlocks;
-                const similarityThreshold: number = data.threshold ?? 0.8;
-                const topPercentile: number = data.topPercentile ?? 0.95;
+                // Use a low minimum threshold to capture all potential matches for dynamic filtering
+                const minThreshold = 0.5;
 
                 // Map to track best match per concept (deduplication)
                 const bestMatchPerConcept: Map<string, {
@@ -127,7 +127,7 @@ self.addEventListener('message', async (event) => {
                     pageNumber?: number;
                 }> = new Map();
                 
-                const similarities: number[] = [];
+                const allSimilarities: number[] = [];
 
                 self.postMessage({
                     status: 'processing',
@@ -154,7 +154,8 @@ self.addEventListener('message', async (event) => {
                     for (let j = 0; j < bokEmbeddings.length; j++) {
                         const sim = cosineSimilarity(textEmbedding, bokEmbeddings[j]);
                         
-                        if (sim >= similarityThreshold) {
+                        // Use low minimum threshold to capture all potential matches
+                        if (sim >= minThreshold) {
                             const conceptId = bokConceptIds[j];
                             const existingMatch = bestMatchPerConcept.get(conceptId);
                             
@@ -175,7 +176,7 @@ self.addEventListener('message', async (event) => {
                                 });
                             }
                             
-                            similarities.push(sim);
+                            allSimilarities.push(sim);
                         }
                     }
 
@@ -186,56 +187,23 @@ self.addEventListener('message', async (event) => {
                     });
                 }
 
-                // Convert map to array
+                // Convert map to array - return ALL raw matches for client-side filtering
                 const allMatches = Array.from(bestMatchPerConcept.values());
-                const uniqueIds = Array.from(bestMatchPerConcept.keys());
+                
+                // Sort by similarity descending
+                allMatches.sort((a, b) => b.similarity - a.similarity);
 
-                // Apply configurable percentile threshold if we have matches
-                let selectedIds: string[] = [];
-                let selectedMatches: typeof allMatches = [];
-
-                if (similarities.length > 0 && allMatches.length > 0) {
-                    const thresholdValue = quantile(similarities, topPercentile);
-                    
-                    // Filter matches above the percentile threshold
-                    selectedMatches = allMatches.filter(m => m.similarity >= thresholdValue);
-                    selectedIds = selectedMatches.map(m => m.conceptId);
-
-                    // Sort by similarity descending
-                    selectedMatches.sort((a, b) => b.similarity - a.similarity);
-
-                    // Add delay to allow progress bar to visually show 100% before completing
-                    setTimeout(() => {
-                        self.postMessage({
-                            status: 'complete',
-                            output: {
-                                allMatchedIds: uniqueIds,
-                                selectedIds: selectedIds,
-                                matches: selectedMatches,
-                                percentileThreshold: thresholdValue,
-                                topPercentile: topPercentile,
-                                totalMatches: allMatches.length,
-                                selectedMatches: selectedMatches.length
-                            }
-                        });
-                    }, 1500);
-                } else {
-                    // Add delay to allow progress bar to visually show 100% before completing
-                    setTimeout(() => {
-                        self.postMessage({
-                            status: 'complete',
-                            output: {
-                                allMatchedIds: [],
-                                selectedIds: [],
-                                matches: [],
-                                percentileThreshold: null,
-                                topPercentile: topPercentile,
-                                totalMatches: 0,
-                                selectedMatches: 0
-                            }
-                        });
-                    }, 1500);
-                }
+                // Add delay to allow progress bar to visually show 100% before completing
+                setTimeout(() => {
+                    self.postMessage({
+                        status: 'complete',
+                        output: {
+                            // Return all raw matches and similarities for client-side dynamic filtering
+                            allMatches: allMatches,
+                            allSimilarities: allSimilarities
+                        }
+                    });
+                }, 1500);
                 break;
 
             default:

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
@@ -8,7 +8,7 @@ import { PanelModule } from 'primeng/panel';
 import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
 import { PDFDocument } from 'pdf-lib';
-import { BokMatchingService, BokClassificationResult } from '../../services/bok-matching.service';
+import { BokMatchingService, BokClassificationResult, BokMatch, BokRawClassificationResult } from '../../services/bok-matching.service';
 import { PdfTextExtractorService } from '../../services/pdf-text-extractor.service';
 
 type Progress = { current: number; total: number } | null;
@@ -20,7 +20,7 @@ type Progress = { current: number; total: number } | null;
   templateUrl: './ai-bok-matching.component.html',
   styleUrls: ['./ai-bok-matching.component.css']
 })
-export class AiBokMatchingComponent implements OnInit, OnDestroy {
+export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
   @Input() pdfDoc: PDFDocument | null = null;
   @Input() pdfArrayBuffer: ArrayBuffer | null = null;
   @Input() bokRelations: string[] = [];
@@ -34,6 +34,11 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy {
   processingProgress: Progress = null;
   isProcessing = false;
   extractionProgress: Progress = null;
+
+  // Store raw match data for dynamic filtering
+  private rawMatchData: BokRawClassificationResult | null = null;
+  // Flag to track if analysis was cancelled
+  private isCancelled = false;
 
   private subscriptions: Subscription[] = [];
 
@@ -55,22 +60,45 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy {
     this.subscriptions.forEach(s => s.unsubscribe());
   }
 
+  ngOnChanges(changes: SimpleChanges): void {
+    // Reset results when a new PDF is uploaded
+    if (changes['pdfArrayBuffer'] && !changes['pdfArrayBuffer'].firstChange) {
+      this.bokMatchingResult = null;
+      this.rawMatchData = null;
+      this.selectedConcepts.clear();
+    }
+  }
+
   private async loadBokData(): Promise<void> {
     try {
       await this.bokMatchingService.loadBokDataFromUrl('assets/bok-embeddings.json');
       this.bokDataLoaded = true;
     } catch (error) {
       console.error('Failed to load BoK data:', error);
-      this.showMessage('warn', 'BoK Data Not Found', 'BoK embeddings file not found. AI classification unavailable.');
+      this.showMessage('error', 'BoK Data Not Found', 'BoK embeddings file not found. AI classification unavailable.');
     }
+  }
+
+  cancelAnalysis(): void {
+    this.isCancelled = true;
+    this.bokMatchingService.cancelProcessing();
+    this.extractionProgress = null;
+    this.processingProgress = null;
+    this.isProcessing = false;
+    this.bokDataLoaded = false;
+    this.showMessage('info', 'Cancelled', 'PDF analysis was cancelled.');
+    // Reload BoK data for next analysis
+    this.loadBokData();
   }
 
   async classifyPdfContent(): Promise<void> {
     if (!this.pdfArrayBuffer || !this.bokDataLoaded) {
-      return this.showMessage('warn', 'No PDF', 'Please upload a PDF file first.');
+      return this.showMessage('error', 'No PDF', 'Please upload a PDF file first.');
     }
 
     try {
+      // Reset cancellation flag at start of new analysis
+      this.isCancelled = false;
       this.bokMatchingResult = null;
       this.extractionProgress = { current: 0, total: 0 };
       this.showMessage('info', 'Extracting Text', 'Extracting text from PDF...');
@@ -83,27 +111,46 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy {
       await this.delay(1500);
       this.extractionProgress = null;
 
+      // Check if cancelled during extraction
+      if (this.isCancelled) {
+        return;
+      }
+
       if (!extracted.pages.length || !extracted.allText.trim()) {
-        return this.showMessage('warn', 'No Text Found', 'Could not extract text. The PDF might be image-based.');
+        return this.showMessage('error', 'No Text Found', 'Could not extract text. The PDF might be image-based.');
       }
 
       const { textBlocks, pageNumbers } = this.pdfTextExtractor.splitIntoBlocks(extracted.pages, 200);
+      
+      // Check if cancelled before starting AI processing
+      if (this.isCancelled) {
+        return;
+      }
+      
       this.showMessage('info', 'Processing', `Processing ${textBlocks.length} blocks from ${extracted.totalPages} pages...`);
 
-      this.bokMatchingResult = await this.bokMatchingService.classifyText(
-        textBlocks, this.similarityThreshold, this.topPercentile / 100, pageNumbers
-      );
+      // Get raw match data from worker
+      this.rawMatchData = await this.bokMatchingService.classifyText(textBlocks, pageNumbers);
+      
+      // Check if cancelled during AI processing
+      if (this.isCancelled) {
+        return;
+      }
+      
+      // Apply current filter settings
+      this.applyFilters();
+      
       // Ensure processing progress bar shows 100% before hiding
       await this.delay(1500);
       this.processingProgress = null;
       
       this.selectedConcepts.clear();
 
-      const { selectedIds } = this.bokMatchingResult;
+      const { selectedIds } = this.bokMatchingResult!;
       const msg = selectedIds.length
         ? `Found ${selectedIds.length} concepts (${selectedIds.filter(id => !this.bokRelations.includes(id)).length} new)`
         : 'No matching concepts found above threshold.';
-      this.showMessage(selectedIds.length ? 'success' : 'info', 'Analysis Complete', msg);
+      this.showMessage(selectedIds.length ? 'info' : 'info', 'Analysis Complete', msg);
     } catch (error) {
       console.error('PDF classification error:', error);
       this.extractionProgress = null;
@@ -119,6 +166,58 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy {
 
   calcPercent = (p: Progress) => !p || !p.total ? 0 : Math.min(100, Math.round((p.current / p.total) * 100));
 
+  // Called when similarity threshold or top percentile sliders change
+  onFilterChange(): void {
+    if (this.rawMatchData) {
+      this.applyFilters();
+    }
+  }
+
+  // Apply current filter settings to raw match data
+  private applyFilters(): void {
+    if (!this.rawMatchData) return;
+
+    const { allMatches, allSimilarities } = this.rawMatchData;
+    
+    // Filter by similarity threshold
+    const thresholdFilteredMatches = allMatches.filter(m => m.similarity >= this.similarityThreshold);
+    const thresholdFilteredSimilarities = allSimilarities.filter(s => s >= this.similarityThreshold);
+    
+    // Calculate percentile threshold from filtered similarities
+    let selectedMatches: BokMatch[] = [];
+    let percentileThreshold: number | null = null;
+    
+    if (thresholdFilteredSimilarities.length > 0 && thresholdFilteredMatches.length > 0) {
+      percentileThreshold = this.quantile(thresholdFilteredSimilarities, this.topPercentile / 100);
+      selectedMatches = thresholdFilteredMatches.filter(m => m.similarity >= percentileThreshold!);
+      // Sort by similarity descending
+      selectedMatches.sort((a, b) => b.similarity - a.similarity);
+    }
+
+    this.bokMatchingResult = {
+      allMatchedIds: thresholdFilteredMatches.map(m => m.conceptId),
+      selectedIds: selectedMatches.map(m => m.conceptId),
+      matches: selectedMatches,
+      percentileThreshold,
+      topPercentile: this.topPercentile / 100,
+      totalMatches: thresholdFilteredMatches.length,
+      selectedMatches: selectedMatches.length
+    };
+  }
+
+  // Calculate quantile (same as in worker)
+  private quantile(arr: number[], q: number): number {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const pos = (sorted.length - 1) * q;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+    
+    if (sorted[base + 1] !== undefined) {
+      return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+    }
+    return sorted[base];
+  }
+
   toggleConceptSelection(id: string): void {
     this.selectedConcepts.has(id) ? this.selectedConcepts.delete(id) : this.selectedConcepts.add(id);
   }
@@ -133,12 +232,11 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy {
     const newConcepts = [...this.selectedConcepts].filter(id => !this.bokRelations.includes(id));
     if (!newConcepts.length) return;
     this.bokRelationsChange.emit([...this.bokRelations, ...newConcepts]);
-    this.showMessage('success', 'Concepts Added', `Added ${newConcepts.length} concepts`);
     this.selectedConcepts.clear();
   }
 
   private showMessage(severity: string, summary: string, detail: string): void {
-    this.messageService.add({ severity, summary, detail, life: 5000 });
+    this.messageService.add({ severity, summary, detail, life: 3000 });
   }
   
   private delay = (ms: number) => new Promise<void>(r => setTimeout(r, ms));

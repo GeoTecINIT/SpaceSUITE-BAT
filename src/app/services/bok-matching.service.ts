@@ -9,6 +9,13 @@ export interface BokMatch {
   pageNumber?: number;
 }
 
+// Raw classification result from worker - contains all matches for client-side filtering
+export interface BokRawClassificationResult {
+  allMatches: BokMatch[];
+  allSimilarities: number[];
+}
+
+// Filtered result used by the component after applying thresholds
 export interface BokClassificationResult {
   allMatchedIds: string[];
   selectedIds: string[];
@@ -70,10 +77,8 @@ export class BokMatchingService implements OnDestroy {
 
   classifyText(
     textBlocks: string[], 
-    threshold = 0.8, 
-    topPercentile = 0.95,
     pageNumbers?: number[]
-  ): Promise<BokClassificationResult> {
+  ): Promise<BokRawClassificationResult> {
     return new Promise((resolve, reject) => {
       if (!textBlocks?.length) return reject(new Error('Text blocks cannot be empty'));
       if (!this.bokDataLoaded) return reject(new Error('BoK data not loaded'));
@@ -103,13 +108,22 @@ export class BokMatchingService implements OnDestroy {
 
       this.worker.addEventListener('message', handler);
       this.worker.onerror = (e) => { this.resetState(); reject(new Error(`Worker error: ${e.message}`)); };
-      this.worker.postMessage({ type: 'classify', data: { textBlocks, threshold, topPercentile, pageNumbers } });
+      this.worker.postMessage({ type: 'classify', data: { textBlocks, pageNumbers } });
     });
   }
 
   private resetState(): void {
     this._isModelLoading.next(false);
     this._processingProgress.next(null);
+  }
+
+  cancelProcessing(): void {
+    // Terminate worker to cancel ongoing processing
+    this.worker?.terminate();
+    this.worker = null;
+    // Worker is terminated, so BoK data needs to be reloaded on next use
+    this.bokDataLoaded = false;
+    this.resetState();
   }
 
   terminateWorker(): void {
