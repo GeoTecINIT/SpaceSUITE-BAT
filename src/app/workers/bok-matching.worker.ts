@@ -1,4 +1,4 @@
-import { pipeline, PipelineType, ProgressCallback } from "@huggingface/transformers";
+import { pipeline, PipelineType, ProgressCallback /* @vite-ignore */} from "@huggingface/transformers";
 
 // Use the Singleton pattern to enable lazy construction of the pipeline.
 class PipelineSingleton {

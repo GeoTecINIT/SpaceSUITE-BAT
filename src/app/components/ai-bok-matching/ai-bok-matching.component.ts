@@ -94,7 +94,7 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
     this.isProcessing = false;
     this.isAnalyzing = false;
     this.bokDataLoaded = false;
-    this.showMessage('info', 'Cancelled', 'PDF analysis was cancelled.');
+    this.showMessage('error', 'Cancelled', 'PDF analysis was cancelled.');
     // Reload BoK data for next analysis
     this.loadBokData();
   }
@@ -112,7 +112,6 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
       this.extractionAbortController = new AbortController();
       this.bokMatchingResult = null;
       this.extractionProgress = { current: 0, total: 0 };
-      this.showMessage('info', 'Extracting Text', 'Extracting text from PDF...');
 
       const extracted = await this.pdfTextExtractor.extractTextFromArrayBuffer(
         this.pdfArrayBuffer,
@@ -140,6 +139,8 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
         return;
       }
 
+      this.showMessage('info', 'Info', 'Text extracted from PDF successfully.');
+
       if (!extracted.pages.length || !extracted.allText.trim()) {
         this.isAnalyzing = false;
         return this.showMessage('error', 'No Text Found', 'Could not extract text. The PDF might be image-based.');
@@ -151,8 +152,6 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
       if (this.isCancelled) {
         return;
       }
-      
-      this.showMessage('info', 'Processing', `Processing ${textBlocks.length} blocks from ${extracted.totalPages} pages...`);
 
       // Get raw match data from worker
       this.rawMatchData = await this.bokMatchingService.classifyText(textBlocks, pageNumbers);
@@ -175,7 +174,7 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
       const msg = selectedIds.length
         ? `Found ${selectedIds.length} concepts (${selectedIds.filter(id => !this.bokRelations.includes(id)).length} new)`
         : 'No matching concepts found above threshold.';
-      this.showMessage(selectedIds.length ? 'info' : 'info', 'Analysis Complete', msg);
+      this.showMessage('info', 'Info', msg);
       this.isAnalyzing = false;
     } catch (error) {
       // Don't show error if cancelled (AbortError)
