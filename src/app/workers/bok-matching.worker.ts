@@ -1,13 +1,16 @@
-import { pipeline, PipelineType, ProgressCallback /* @vite-ignore */} from "@huggingface/transformers";
+import { pipeline, PipelineType , ProgressCallback /* @vite-ignore */} from "@huggingface/transformers";
 
 // Use the Singleton pattern to enable lazy construction of the pipeline.
 class PipelineSingleton {
     static task: PipelineType = 'feature-extraction';
     static model = 'TaylorAI/bge-micro-v2';
     // Alternatives:
-    // TaylorAI/bge-micro-v2: 384-dim, smaller model, faster but less accurate (20ms/block))
+    // TaylorAI/bge-micro-v2: 384-dim, smaller model, faster but less accurate (20ms/block)) - 18M
     // onnx-community/embeddinggemma-300m-ONNX: 1024-dim, larger model, more accurate but slower (1s/block!)
-
+    // permutans/Tarka-Embedding-150M-V1-ONNX-Q (Discarted due to being too slow)
+    // Qdrant/bge-base-en-v1.5-onnx-Q (Discarted due to being too slow) -100M
+    // keisuke-miyako/bge-small-en-v1.5-onnx-int8 (Best model quality/size)
+    
     static instance: any = null;
 
     static async getInstance(progress_callback?: ProgressCallback) {
@@ -134,15 +137,14 @@ self.addEventListener('message', async (event) => {
                     data: { total: textBlocks.length, current: 0 }
                 });
 
+                // Track last reported percentage (in multiples of 5)
+                let lastReportedPercent = 0;
+
                 for (let i = 0; i < textBlocks.length; i++) {
                     const text = textBlocks[i];
                     
                     // Skip empty or very short text blocks
                     if (!text || text.trim().length < 10) {
-                        self.postMessage({
-                            status: 'processing',
-                            data: { total: textBlocks.length, current: i + 1 }
-                        });
                         continue;
                     }
                     
@@ -180,11 +182,19 @@ self.addEventListener('message', async (event) => {
                         }
                     }
 
-                    // Report progress
-                    self.postMessage({
-                        status: 'processing',
-                        data: { total: textBlocks.length, current: i + 1 }
-                    });
+                    // Throttled progress reporting: update every 5% to avoid flooding the main thread
+                    const currentPercent = Math.floor(((i + 1) / textBlocks.length) * 100);
+                    const currentPercentRounded = Math.floor(currentPercent / 5) * 5; // Round down to multiple of 5
+                    
+                    if (currentPercentRounded > lastReportedPercent || i === textBlocks.length - 1) {
+                        lastReportedPercent = currentPercentRounded;
+                        self.postMessage({
+                            status: 'processing',
+                            data: { total: textBlocks.length, current: i + 1 }
+                        });
+                        // Yield to allow main thread to process messages
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
                 }
 
                 // Convert map to array - return ALL raw matches for client-side filtering

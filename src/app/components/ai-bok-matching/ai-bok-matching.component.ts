@@ -194,7 +194,13 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
     return !!this.bokMatchingResult?.matches?.every(m => this.selectedConcepts.has(m.conceptId));
   }
 
-  calcPercent = (p: Progress) => !p || !p.total ? 0 : Math.min(100, Math.round((p.current / p.total) * 100));
+  // Round to nearest multiple of 5 for cleaner display
+  calcPercent = (p: Progress) => {
+    if (!p || !p.total) return 0;
+    const percent = (p.current / p.total) * 100;
+    if (percent >= 100) return 100;
+    return Math.floor(percent / 5) * 5;
+  };
 
   // Called when similarity threshold or top percentile sliders change
   onFilterChange(): void {
