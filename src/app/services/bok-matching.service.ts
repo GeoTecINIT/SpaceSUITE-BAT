@@ -1,6 +1,8 @@
 import { Injectable, OnDestroy } from '@angular/core';
+
 import { BehaviorSubject } from 'rxjs';
 
+// Types
 export interface BokMatch {
   conceptId: string;
   conceptName: string;
@@ -9,13 +11,11 @@ export interface BokMatch {
   pageNumber?: number;
 }
 
-// Raw classification result from worker - contains all matches for client-side filtering
 export interface BokRawClassificationResult {
   allMatches: BokMatch[];
   allSimilarities: number[];
 }
 
-// Filtered result used by the component after applying thresholds
 export interface BokClassificationResult {
   allMatchedIds: string[];
   selectedIds: string[];
@@ -34,19 +34,20 @@ export interface BokData {
 
 @Injectable({ providedIn: 'root' })
 export class BokMatchingService implements OnDestroy {
+  private readonly _isModelLoading = new BehaviorSubject<boolean>(false);
+  private readonly _processingProgress = new BehaviorSubject<{ current: number; total: number } | null>(null);
   private worker: Worker | null = null;
-  private _isModelLoading = new BehaviorSubject<boolean>(false);
-  private _processingProgress = new BehaviorSubject<{ current: number; total: number } | null>(null);
+  private bokDataLoaded = false;
 
   readonly isModelLoading$ = this._isModelLoading.asObservable();
   readonly processingProgress$ = this._processingProgress.asObservable();
 
-  private bokDataLoaded = false;
-
-  private initializeWorker(): void {
-    this.worker ??= new Worker(new URL('../workers/bok-matching.worker', import.meta.url), { type: 'module' });
+  // Lifecycle
+  ngOnDestroy(): void { 
+    this.terminateWorker(); 
   }
 
+  // Public methods
   loadBokData(bokData: BokData): Promise<number> {
     return new Promise((resolve, reject) => {
       this.initializeWorker();
@@ -75,10 +76,7 @@ export class BokMatchingService implements OnDestroy {
     return this.loadBokData(await response.json());
   }
 
-  classifyText(
-    textBlocks: string[], 
-    pageNumbers?: number[]
-  ): Promise<BokRawClassificationResult> {
+  classifyText(textBlocks: string[], pageNumbers?: number[]): Promise<BokRawClassificationResult> {
     return new Promise((resolve, reject) => {
       if (!textBlocks?.length) return reject(new Error('Text blocks cannot be empty'));
       if (!this.bokDataLoaded) return reject(new Error('BoK data not loaded'));
@@ -112,16 +110,9 @@ export class BokMatchingService implements OnDestroy {
     });
   }
 
-  private resetState(): void {
-    this._isModelLoading.next(false);
-    this._processingProgress.next(null);
-  }
-
   cancelProcessing(): void {
-    // Terminate worker to cancel ongoing processing
     this.worker?.terminate();
     this.worker = null;
-    // Worker is terminated, so BoK data needs to be reloaded on next use
     this.bokDataLoaded = false;
     this.resetState();
   }
@@ -133,5 +124,13 @@ export class BokMatchingService implements OnDestroy {
     this.resetState();
   }
 
-  ngOnDestroy(): void { this.terminateWorker(); }
+  // Private methods
+  private initializeWorker(): void {
+    this.worker ??= new Worker(new URL('../workers/bok-matching.worker', import.meta.url), { type: 'module' });
+  }
+
+  private resetState(): void {
+    this._isModelLoading.next(false);
+    this._processingProgress.next(null);
+  }
 }
