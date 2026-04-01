@@ -7,11 +7,18 @@
                     icon="pi pi-file" (click)="navigateToMyDocs()" [disabled]="!logged" />
         </div>
         <div class="h-full flex flex-column">
-            <p-accordion [value]="['0', '1', '2']" [multiple]="true" class="custom-acordion">
+            <p-accordion [value]="['0', '1', '2', '3']" [multiple]="true" class="custom-acordion">
                 <p-accordion-panel value="0">
                     <p-accordion-header>Upload File</p-accordion-header>
                     <p-accordion-content>
                         <app-upload-document (pdfDocumentChange)="onPdfDocChange($event)" (documentDataChange)="formContent = $event" (conceptsChange)="bokRelations = $event"></app-upload-document>
+                    </p-accordion-content>
+                </p-accordion-panel>
+
+                <p-accordion-panel value="3">
+                    <p-accordion-header>AI BoK Concept Matching</p-accordion-header>
+                    <p-accordion-content>
+                        <app-ai-bok-matching [pdfDoc]="pdfDoc" [pdfArrayBuffer]="pdfArrayBuffer" [(bokRelations)]="bokRelations"></app-ai-bok-matching>
                     </p-accordion-content>
                 </p-accordion-panel>
             

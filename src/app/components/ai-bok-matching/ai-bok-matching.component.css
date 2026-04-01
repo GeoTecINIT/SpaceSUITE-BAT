@@ -1,0 +1,22 @@
+.blue-border-round {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.custom-progress-bar {
+  --p-progressbar-value-background: var(--secondary-color);
+}
+
+.custom-checkbox {
+    --p-checkbox-checked-background: var(--secondary-color);
+    --p-checkbox-checked-border-color: var(--secondary-color);
+    --p-checkbox-checked-hover-background: var(--hover-color);
+    --p-checkbox-checked-hover-border-color: var(--hover-color);
+    --p-checkbox-checked-focus-border-color: var(--secondary-color);  
+    --p-checkbox-focus-ring-color: var(--secondary-color);
+}
+
+.custom-slider {
+  --p-slider-range-background: var(--secondary-color);
+}

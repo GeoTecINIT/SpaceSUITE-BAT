@@ -1,9 +1,10 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { UploadDocumentComponent } from '../upload-document/upload-document.component';
 import { BokComponent } from '@eo4geo/ngx-bok-visualization';
 import { AnnotateDocumentComponent } from '../annotate-document/annotate-document.component';
 import { PDFDocument } from 'pdf-lib';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { catchError, finalize, of, Subscription } from 'rxjs';
 import { AccordionModule } from 'primeng/accordion';
 import { ButtonModule } from 'primeng/button';
@@ -15,6 +16,7 @@ import { MessageService } from "primeng/api";
 import { StorageService } from '../../services/storage.service';
 import { Router } from '@angular/router';
 import { AuthService } from '@eo4geo/ngx-bok-utils';
+import { AiBokMatchingComponent } from '../ai-bok-matching/ai-bok-matching.component';
 
 @Component({
   standalone: true,
@@ -26,18 +28,21 @@ import { AuthService } from '@eo4geo/ngx-bok-utils';
     AnnotateDocumentComponent,
     BokComponent,
     CommonModule,
+    FormsModule,
     AccordionModule,
     DocumentInformationComponent,
     ButtonModule,
     DividerModule,
-    ToastModule
+    ToastModule,
+    AiBokMatchingComponent
   ],
   providers: [MessageService]
 })
-export class MainPageComponent {
+export class MainPageComponent implements OnInit, OnDestroy {
   concept: string = 'GIST'
   logged: boolean = false;
   pdfDoc: PDFDocument | null = null;
+  pdfArrayBuffer: ArrayBuffer | null = null;
   formContent: DocumentForm = new DocumentForm();
   bokRelations: string[] = [];
 
@@ -45,7 +50,12 @@ export class MainPageComponent {
 
   private loggedSubscrition!: Subscription;
 
-  constructor(private storageService: StorageService, private messageService: MessageService, private router: Router, private authService: AuthService) {}
+  constructor(
+    private storageService: StorageService,
+    private messageService: MessageService,
+    private router: Router,
+    private authService: AuthService
+  ) {}
 
   ngOnInit() {
     this.loggedSubscrition = this.authService.getUserState().subscribe(state => {
@@ -134,7 +144,13 @@ export class MainPageComponent {
 
   onPdfDocChange(newDoc: PDFDocument | null) {
     this.pdfDoc = newDoc;
+    
     if (newDoc) {
+      // Store the PDF as ArrayBuffer for text extraction
+      newDoc.save().then(bytes => {
+        this.pdfArrayBuffer = bytes.buffer as ArrayBuffer;
+      });
+      
       this.messageService.add({ 
         severity: 'info', 
         summary: 'Info', 
@@ -142,6 +158,8 @@ export class MainPageComponent {
         life: 3000, 
         closable: true 
       }); 
+    } else {
+      this.pdfArrayBuffer = null;
     }
   }
 }
