@@ -49,8 +49,3 @@
 .docs-button:hover {
     --p-button-text-primary-color: var(--hover-color);
 }
-
-.custom-panel {
-  --p-panel-color: var(--primary-color);
-  --p-panel-header-color: var(--primary-color); 
-}

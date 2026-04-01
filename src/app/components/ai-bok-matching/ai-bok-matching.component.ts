@@ -8,6 +8,8 @@ import { ProgressBarModule } from 'primeng/progressbar';
 import { PanelModule } from 'primeng/panel';
 import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
+import { CheckboxModule } from 'primeng/checkbox';
+import { SliderModule } from 'primeng/slider';
 
 import { PDFDocument } from 'pdf-lib';
 import { BokMatchingService, BokClassificationResult, BokMatch, BokRawClassificationResult } from '../../services/bok-matching.service';
@@ -18,7 +20,7 @@ type Progress = { current: number; total: number } | null;
 @Component({
   selector: 'app-ai-bok-matching',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, ProgressBarModule, PanelModule, TooltipModule],
+  imports: [CommonModule, FormsModule, ButtonModule, ProgressBarModule, PanelModule, TooltipModule, CheckboxModule, SliderModule],
   templateUrl: './ai-bok-matching.component.html',
   styleUrls: ['./ai-bok-matching.component.css']
 })
