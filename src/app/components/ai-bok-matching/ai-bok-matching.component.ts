@@ -33,7 +33,7 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
   bokMatchingResult: BokClassificationResult | null = null;
   bokDataLoaded = false;
   similarityThreshold = 0.8;
-  topPercentile = 95;
+  topPercentile = 0;
   selectedConcepts = new Set<string>();
   processingProgress: Progress = null;
   extractionProgress: Progress = null;
@@ -130,7 +130,7 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
         return this.showMessage('error', 'No Text Found', 'Could not extract text. The PDF might be image-based.');
       }
 
-      const { textBlocks, pageNumbers } = this.pdfTextExtractor.splitIntoBlocks(extracted.pages, 200);
+      const { textBlocks, pageNumbers } = this.pdfTextExtractor.splitIntoBlocks(extracted.pages, 150);
       if (isStale()) return;
 
       this.rawMatchData = await this.bokMatchingService.classifyText(textBlocks, pageNumbers);

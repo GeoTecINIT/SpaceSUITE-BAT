@@ -38,7 +38,7 @@ export class PdfTextExtractorService {
       
       pages.push({
         pageNumber: pageNum,
-        text: textContent.items.map((item: any) => item.str).join(' ').replace(/\s+/g, ' ').trim()
+        text: this.buildPageText(textContent)
       });
 
       onProgress?.(pageNum, totalPages);
@@ -79,7 +79,7 @@ export class PdfTextExtractorService {
       
       pages.push({
         pageNumber: pageNum,
-        text: textContent.items.map((item: any) => item.str).join(' ').replace(/\s+/g, ' ').trim()
+        text: this.buildPageText(textContent)
       });
 
       onProgress?.(pageNum, totalPages);
@@ -88,51 +88,78 @@ export class PdfTextExtractorService {
     return { pages, totalPages, allText: pages.map(p => p.text).join('\n\n') };
   }
 
-  splitIntoBlocks(pages: PageText[], maxBlockLength = 1500): { textBlocks: string[]; pageNumbers: number[] } {
+  splitIntoBlocks(pages: PageText[], maxBlockLength = 150): { textBlocks: string[]; pageNumbers: number[] } {
     const textBlocks: string[] = [];
     const pageNumbers: number[] = [];
 
     for (const page of pages) {
       if (!page.text?.trim()) continue;
 
-      const paragraphs = page.text.split(/\n\n+/);
-      let currentBlock = '';
+      const paragraphs = page.text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
 
       for (const paragraph of paragraphs) {
-        if (paragraph.length > maxBlockLength) {
-          if (currentBlock.trim()) {
-            textBlocks.push(currentBlock.trim());
+        if (paragraph.length <= maxBlockLength) {
+          textBlocks.push(paragraph);
+          pageNumbers.push(page.pageNumber);
+          continue;
+        }
+
+        const sentences = paragraph.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+        const sentenceList = sentences.length ? sentences : [paragraph];
+
+        let currentBlock = '';
+        for (const sentence of sentenceList) {
+          if (!currentBlock && sentence.length > maxBlockLength) {
+            textBlocks.push(sentence);
             pageNumbers.push(page.pageNumber);
-            currentBlock = '';
+            continue;
           }
 
-          const sentences = paragraph.split(/(?<=[.!?])\s+/);
-          for (const sentence of sentences) {
-            if (currentBlock.length + sentence.length > maxBlockLength && currentBlock) {
-              textBlocks.push(currentBlock.trim());
+          if (!currentBlock) {
+            currentBlock = sentence;
+            continue;
+          }
+
+          if (currentBlock.length + sentence.length + 1 <= maxBlockLength) {
+            currentBlock += ' ' + sentence;
+          } else {
+            textBlocks.push(currentBlock);
+            pageNumbers.push(page.pageNumber);
+            if (sentence.length > maxBlockLength) {
+              textBlocks.push(sentence);
               pageNumbers.push(page.pageNumber);
-              currentBlock = sentence;
+              currentBlock = '';
             } else {
-              currentBlock += (currentBlock ? ' ' : '') + sentence;
+              currentBlock = sentence;
             }
           }
-        } else {
-          if (currentBlock.length + paragraph.length > maxBlockLength && currentBlock) {
-            textBlocks.push(currentBlock.trim());
-            pageNumbers.push(page.pageNumber);
-            currentBlock = paragraph;
-          } else {
-            currentBlock += (currentBlock ? ' ' : '') + paragraph;
-          }
         }
-      }
 
-      if (currentBlock.trim()) {
-        textBlocks.push(currentBlock.trim());
-        pageNumbers.push(page.pageNumber);
+        if (currentBlock) {
+          textBlocks.push(currentBlock);
+          pageNumbers.push(page.pageNumber);
+        }
       }
     }
 
     return { textBlocks, pageNumbers };
+  }
+
+  private buildPageText(textContent: any): string {
+    const items = textContent?.items ?? [];
+    let text = '';
+
+    for (const item of items) {
+      const str = String(item?.str ?? '').replace(/\s+/g, ' ').trim();
+      if (str) {
+        if (text && !text.endsWith('\n') && !text.endsWith(' ')) text += ' ';
+        text += str;
+      }
+      if (item?.hasEOL) {
+        text += '\n';
+      }
+    }
+
+    return text.replace(/\n{3,}/g, '\n\n').trim();
   }
 }
