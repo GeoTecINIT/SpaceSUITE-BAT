@@ -10,12 +10,17 @@ interface BokMatch {
 }
 
 // Hybrid weighting
-const HYBRID_DENSE_WEIGHT = 0.7;
-const HYBRID_BM25_WEIGHT = 0.3;
+const HYBRID_DENSE_WEIGHT = 0.70;
+const HYBRID_BM25_WEIGHT = 0.30;
 
 // BM25 configuration
-const BM25_K1 = 1.5;
+const BM25_K1 = 1.7;
 const BM25_B = 0.75;
+
+// Jaro-Winkler fuzzy token matching
+const JW_MIN_SIMILARITY = 0.9;
+const JW_PREFIX_SCALE = 0.1;
+const JW_MAX_PREFIX = 4;
 
 // State
 let bokEmbeddings: number[][] | null = null;
@@ -27,6 +32,8 @@ let bm25DocTermFreqs: Array<Map<string, number>> = [];
 let bm25DocLengths: number[] = [];
 let bm25AvgDocLength = 0;
 let bm25Idf = new Map<string, number>();
+let bm25DocFreq = new Map<string, number>();
+let bm25Terms: string[] = [];
 
 // Pipeline singleton
 class PipelineSingleton {
@@ -67,11 +74,62 @@ function tokenize(text: string): string[] {
   return normalized ? normalized.split(/\s+/).filter(t => t.length > 1) : [];
 }
 
+function jaroWinkler(a: string, b: string): number {
+  if (a === b) return 1;
+
+  const lenA = a.length;
+  const lenB = b.length;
+  if (!lenA || !lenB) return 0;
+
+  const matchDistance = Math.max(0, Math.floor(Math.max(lenA, lenB) / 2) - 1);
+  const aMatches = new Array<boolean>(lenA).fill(false);
+  const bMatches = new Array<boolean>(lenB).fill(false);
+
+  let matches = 0;
+  for (let i = 0; i < lenA; i++) {
+    const start = Math.max(0, i - matchDistance);
+    const end = Math.min(i + matchDistance + 1, lenB);
+
+    for (let j = start; j < end; j++) {
+      if (bMatches[j]) continue;
+      if (a[i] !== b[j]) continue;
+      aMatches[i] = true;
+      bMatches[j] = true;
+      matches++;
+      break;
+    }
+  }
+
+  if (!matches) return 0;
+
+  let transpositions = 0;
+  let k = 0;
+  for (let i = 0; i < lenA; i++) {
+    if (!aMatches[i]) continue;
+    while (!bMatches[k]) k++;
+    if (a[i] !== b[k]) transpositions++;
+    k++;
+  }
+
+  const halfTranspositions = transpositions / 2;
+  const jaro = (matches / lenA + matches / lenB + (matches - halfTranspositions) / matches) / 3;
+
+  let prefix = 0;
+  const maxPrefix = Math.min(JW_MAX_PREFIX, lenA, lenB);
+  while (prefix < maxPrefix && a[prefix] === b[prefix]) {
+    prefix++;
+  }
+
+  return jaro + prefix * JW_PREFIX_SCALE * (1 - jaro);
+}
+
 function buildBm25Index(conceptIds: string[], conceptNames: string[]): void {
   const docCount = conceptNames.length;
   bm25DocTermFreqs = new Array(docCount);
   bm25DocLengths = new Array(docCount);
   bm25Idf = new Map<string, number>();
+  bm25DocFreq = new Map<string, number>();
+  bm25Terms = [];
 
   const docFreq = new Map<string, number>();
   let totalLength = 0;
@@ -98,6 +156,9 @@ function buildBm25Index(conceptIds: string[], conceptNames: string[]): void {
 
   bm25AvgDocLength = docCount ? totalLength / docCount : 0;
 
+  bm25DocFreq = docFreq;
+  bm25Terms = Array.from(docFreq.keys());
+
   for (const [term, df] of docFreq.entries()) {
     const idf = Math.log(1 + (docCount - df + 0.5) / (df + 0.5));
     bm25Idf.set(term, idf);
@@ -112,6 +173,39 @@ function computeBm25Scores(queryTokens: string[]): { scores: Float32Array; max: 
   }
 
   const uniqueTerms = Array.from(new Set(queryTokens));
+  const termMatches = new Map<string, Array<{ term: string; weight: number }>>();
+  const termIdf = new Map<string, number>();
+
+  for (const term of uniqueTerms) {
+    const matches: Array<{ term: string; weight: number }> = [];
+    for (const candidate of bm25Terms) {
+      const similarity = jaroWinkler(term, candidate);
+      if (similarity >= JW_MIN_SIMILARITY) {
+        matches.push({ term: candidate, weight: similarity });
+      }
+    }
+
+    if (!matches.length) continue;
+    termMatches.set(term, matches);
+
+    if (matches.length === 1 && matches[0].term === term) {
+      const exactIdf = bm25Idf.get(term);
+      if (exactIdf !== undefined) {
+        termIdf.set(term, exactIdf);
+        continue;
+      }
+    }
+
+    let weightedDf = 0;
+    for (const match of matches) {
+      const df = bm25DocFreq.get(match.term) ?? 0;
+      weightedDf += df * match.weight;
+    }
+
+    const boundedDf = Math.min(weightedDf, docCount);
+    const idf = Math.log(1 + (docCount - boundedDf + 0.5) / (boundedDf + 0.5));
+    termIdf.set(term, idf);
+  }
   let max = 0;
 
   for (let i = 0; i < docCount; i++) {
@@ -121,9 +215,17 @@ function computeBm25Scores(queryTokens: string[]): { scores: Float32Array; max: 
 
     let score = 0;
     for (const term of uniqueTerms) {
-      const tf = tfMap.get(term) ?? 0;
+      const matches = termMatches.get(term);
+      if (!matches) continue;
+
+      let tf = 0;
+      for (const match of matches) {
+        const termTf = tfMap.get(match.term) ?? 0;
+        if (termTf) tf += termTf * match.weight;
+      }
+
       if (!tf) continue;
-      const idf = bm25Idf.get(term) ?? 0;
+      const idf = termIdf.get(term) ?? 0;
       const denom = tf + BM25_K1 * (1 - BM25_B + BM25_B * (docLength / bm25AvgDocLength));
       score += idf * ((tf * (BM25_K1 + 1)) / denom);
     }
