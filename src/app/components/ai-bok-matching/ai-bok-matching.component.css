@@ -20,3 +20,12 @@
 .custom-slider {
   --p-slider-range-background: var(--secondary-color);
 }
+
+::ng-deep .p-tooltip {
+  --p-tooltip-background: var(--primary-color);
+}
+
+.custom-panel {
+  --p-panel-color: var(--primary-color);
+  --p-panel-header-color: var(--primary-color); 
+}

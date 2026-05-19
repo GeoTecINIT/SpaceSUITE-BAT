@@ -4,12 +4,11 @@ import { BokInformationService } from '@eo4geo/ngx-bok-visualization';
 import { map, Observable, Subscription, take } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { ChipModule } from 'primeng/chip';
-import { TooltipModule } from 'primeng/tooltip';
 
 @Component({
   standalone: true,
   selector: 'app-annotate-document',
-  imports: [CommonModule, ButtonModule, ChipModule, TooltipModule],
+  imports: [CommonModule, ButtonModule, ChipModule],
   templateUrl: './annotate-document.component.html',
   styleUrl: './annotate-document.component.css',
 })
