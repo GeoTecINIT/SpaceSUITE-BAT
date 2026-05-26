@@ -1,8 +1,15 @@
 import { Injectable } from '@angular/core';
 
 import * as pdfjsLib from 'pdfjs-dist';
+// @ts-expect-error - wordsninja ships without TypeScript types.
+import WordsNinjaPack from 'wordsninja';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+type WordsNinjaInstance = {
+  loadDictionary: () => Promise<void>;
+  splitSentence: (text: string, options?: { camelCaseSplitter?: boolean; joinWords?: boolean }) => string;
+};
 
 // Types
 export interface PageText {
@@ -18,6 +25,7 @@ export interface PdfTextExtractionResult {
 
 @Injectable({ providedIn: 'root' })
 export class PdfTextExtractorService {
+  private wordsNinja: WordsNinjaInstance | null = null;
 
   // Public methods
   async extractTextFromArrayBuffer(
@@ -35,10 +43,10 @@ export class PdfTextExtractorService {
       
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      
+
       pages.push({
         pageNumber: pageNum,
-        text: this.buildPageText(textContent)
+        text: await this.recoverSpaces(this.buildPageText(textContent))
       });
 
       onProgress?.(pageNum, totalPages);
@@ -76,10 +84,10 @@ export class PdfTextExtractorService {
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      
+
       pages.push({
         pageNumber: pageNum,
-        text: this.buildPageText(textContent)
+        text: await this.recoverSpaces(this.buildPageText(textContent))
       });
 
       onProgress?.(pageNum, totalPages);
@@ -98,6 +106,8 @@ export class PdfTextExtractorService {
       const paragraphs = page.text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
 
       for (const paragraph of paragraphs) {
+        if (this.looksLikeAsciiArt(paragraph)) continue;
+
         if (paragraph.length <= maxBlockLength) {
           textBlocks.push(paragraph);
           pageNumbers.push(page.pageNumber);
@@ -145,12 +155,51 @@ export class PdfTextExtractorService {
     return { textBlocks, pageNumbers };
   }
 
+  private async ensureSegmenter(): Promise<WordsNinjaInstance> {
+    if (this.wordsNinja) return this.wordsNinja;
+    const instance: WordsNinjaInstance = new (WordsNinjaPack as unknown as new () => WordsNinjaInstance)();
+    await instance.loadDictionary();
+    this.wordsNinja = instance;
+    return instance;
+  }
+
+  private async recoverSpaces(text: string): Promise<string> {
+    if (!/[a-zA-Z]{16,}/.test(text)) return text;
+    const segmenter = await this.ensureSegmenter();
+    return text.replace(/[a-zA-Z]{16,}/g, (match) =>
+      segmenter.splitSentence(match, { camelCaseSplitter: true, joinWords: true })
+    );
+  }
+
+  private looksLikeAsciiArt(text: string): boolean {
+    if (!text) return false;
+    const nonAlphaCount = (text.match(/[^a-zA-Z0-9\s]/g) ?? []).length;
+    const nonAlphaRatio = nonAlphaCount / text.length;
+    const hasLongRunOfSymbols = /[-=_|+*~#]{6,}/.test(text);
+    return nonAlphaRatio > 0.35 || hasLongRunOfSymbols;
+  }
+
+  private sanitizeText(text: string): string {
+    return text
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '') // remove diacritics only
+      .replace(/\(cid:\d+\)/gi, ' ')
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
+      .replace(/[\u00AD\u200B-\u200F\u2028-\u202F\u205F-\u206F\uFEFF]/g, '')
+      .replace(/(\w)-\s*\n\s*(\w)/g, '$1$2')
+      .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+      .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+      .replace(/[\u2013\u2014\u2015]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   private buildPageText(textContent: any): string {
     const items = textContent?.items ?? [];
     let text = '';
 
     for (const item of items) {
-      const str = String(item?.str ?? '').replace(/\s+/g, ' ').trim();
+      const str = this.sanitizeText(String(item?.str ?? ''));
       if (str) {
         if (text && !text.endsWith('\n') && !text.endsWith(' ')) text += ' ';
         text += str;

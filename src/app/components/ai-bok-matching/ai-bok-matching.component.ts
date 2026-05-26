@@ -18,13 +18,13 @@ import { PdfTextExtractorService } from '../../services/pdf-text-extractor.servi
 type Progress = { current: number; total: number } | null;
 
 @Component({
-  selector: 'app-ai-bok-matching',
   standalone: true,
+  selector: 'app-ai-bok-matching',
   imports: [CommonModule, FormsModule, ButtonModule, ProgressBarModule, PanelModule, TooltipModule, CheckboxModule, SliderModule],
   templateUrl: './ai-bok-matching.component.html',
   styleUrls: ['./ai-bok-matching.component.css']
 })
-export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
+export class AiBokMatchingComponent {
   @Input() pdfDoc: PDFDocument | null = null;
   @Input() pdfArrayBuffer: ArrayBuffer | null = null;
   @Input() bokRelations: string[] = [];
@@ -33,7 +33,6 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
   bokMatchingResult: BokClassificationResult | null = null;
   bokDataLoaded = false;
   similarityThreshold = 0.8;
-  topPercentile = 0;
   selectedConcepts = new Set<string>();
   processingProgress: Progress = null;
   extractionProgress: Progress = null;
@@ -211,35 +210,17 @@ export class AiBokMatchingComponent implements OnInit, OnDestroy, OnChanges {
     
     const thresholdFiltered = allMatches.filter(m => m.similarity >= threshold);
     
-    let selectedMatches: BokMatch[] = [];
-    let percentileThreshold: number | null = null;
-    
-    if (thresholdFiltered.length) {
-      percentileThreshold = this.quantile(thresholdFiltered.map(m => m.similarity), this.topPercentile / 100);
-      selectedMatches = thresholdFiltered
-        .filter(m => m.similarity >= percentileThreshold!)
-        .sort((a, b) => b.similarity - a.similarity);
-    }
+    const selectedMatches: BokMatch[] = thresholdFiltered.length
+      ? [...thresholdFiltered].sort((a, b) => b.similarity - a.similarity)
+      : [];
 
     this.bokMatchingResult = {
       allMatchedIds: thresholdFiltered.map(m => m.conceptId),
       selectedIds: selectedMatches.map(m => m.conceptId),
       matches: selectedMatches,
-      percentileThreshold,
-      topPercentile: this.topPercentile / 100,
       totalMatches: thresholdFiltered.length,
       selectedMatches: selectedMatches.length
     };
-  }
-
-  private quantile(arr: number[], q: number): number {
-    const sorted = [...arr].sort((a, b) => a - b);
-    const pos = (sorted.length - 1) * q;
-    const base = Math.floor(pos);
-    const rest = pos - base;
-    return sorted[base + 1] !== undefined 
-      ? sorted[base] + rest * (sorted[base + 1] - sorted[base]) 
-      : sorted[base];
   }
 
   private showMessage(severity: string, summary: string, detail: string): void {

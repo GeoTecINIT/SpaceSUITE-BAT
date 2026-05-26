@@ -14,13 +14,17 @@ const HYBRID_DENSE_WEIGHT = 0.70;
 const HYBRID_BM25_WEIGHT = 0.30;
 
 // BM25 configuration
-const BM25_K1 = 1.7;
-const BM25_B = 0.75;
+const BM25_K1 = 1.5;
+const BM25_B = 0.7;
 
 // Jaro-Winkler fuzzy token matching
-const JW_MIN_SIMILARITY = 0.9;
-const JW_PREFIX_SCALE = 0.1;
-const JW_MAX_PREFIX = 4;
+const JW_MIN_SIMILARITY = 0.94;
+const JW_PREFIX_SCALE = 0.05;
+const JW_MAX_PREFIX = 12;
+
+// Score normalization & thresholding
+const BM25_NORM_SCALE = 5.0;
+const MIN_HYBRID_THRESHOLD = 0.5;
 
 // State
 let bokEmbeddings: number[][] | null = null;
@@ -50,16 +54,16 @@ class PipelineSingleton {
 // Utility functions
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   let dotProduct = 0, normA = 0, normB = 0;
-  
+
   for (let i = 0; i < vecA.length; i++) {
     dotProduct += vecA[i] * vecB[i];
     normA += vecA[i] * vecA[i];
     normB += vecB[i] * vecB[i];
   }
-  
+
   normA = Math.sqrt(normA);
   normB = Math.sqrt(normB);
-  
+
   return (normA === 0 || normB === 0) ? 0 : dotProduct / (normA * normB);
 }
 
@@ -165,11 +169,11 @@ function buildBm25Index(conceptIds: string[], conceptNames: string[]): void {
   }
 }
 
-function computeBm25Scores(queryTokens: string[]): { scores: Float32Array; max: number } {
+function computeBm25Scores(queryTokens: string[]): Float32Array {
   const docCount = bm25DocTermFreqs.length;
   const scores = new Float32Array(docCount);
   if (!docCount || !bm25AvgDocLength || !queryTokens.length) {
-    return { scores, max: 0 };
+    return scores;
   }
 
   const uniqueTerms = Array.from(new Set(queryTokens));
@@ -196,17 +200,14 @@ function computeBm25Scores(queryTokens: string[]): { scores: Float32Array; max: 
       }
     }
 
-    let weightedDf = 0;
+    let bestIdf = 0;
     for (const match of matches) {
-      const df = bm25DocFreq.get(match.term) ?? 0;
-      weightedDf += df * match.weight;
+      const matchIdf = bm25Idf.get(match.term) ?? 0;
+      const effectiveIdf = matchIdf * match.weight;
+      if (effectiveIdf > bestIdf) bestIdf = effectiveIdf;
     }
-
-    const boundedDf = Math.min(weightedDf, docCount);
-    const idf = Math.log(1 + (docCount - boundedDf + 0.5) / (boundedDf + 0.5));
-    termIdf.set(term, idf);
+    termIdf.set(term, bestIdf);
   }
-  let max = 0;
 
   for (let i = 0; i < docCount; i++) {
     const tfMap = bm25DocTermFreqs[i];
@@ -231,10 +232,9 @@ function computeBm25Scores(queryTokens: string[]): { scores: Float32Array; max: 
     }
 
     scores[i] = score;
-    if (score > max) max = score;
   }
 
-  return { scores, max };
+  return scores;
 }
 
 function postStatus(status: string, data?: any): void {
@@ -250,7 +250,7 @@ function handleLoadBok(data: any): void {
   if (bokConceptIds && bokConceptNames) {
     buildBm25Index(bokConceptIds, bokConceptNames);
   }
-  
+
   postStatus('bok-loaded', { data: { conceptCount: bokConceptIds?.length || 0 } });
 }
 
@@ -268,7 +268,6 @@ async function handleClassify(data: any): Promise<void> {
   postStatus('ready');
 
   const { textBlocks, pageNumbers } = data;
-  const minThreshold = 0.5;
   const bestMatchPerConcept = new Map<string, BokMatch>();
   const allSimilarities: number[] = [];
   let lastReportedPercent = 0;
@@ -280,21 +279,21 @@ async function handleClassify(data: any): Promise<void> {
     if (!text || text.trim().length < 10) continue;
 
     const queryTokens = tokenize(text);
-    const { scores: bm25Scores, max: maxBm25 } = computeBm25Scores(queryTokens);
-    const bm25NormFactor = maxBm25 > 0 ? 1 / maxBm25 : 0;
-    
+    const bm25Scores = computeBm25Scores(queryTokens);
+
     const output = await extractor(text, { pooling: 'mean', normalize: true });
     const textEmbedding = Array.from(output.data as Float32Array);
 
     for (let j = 0; j < bokEmbeddings!.length; j++) {
       const denseSim = cosineSimilarity(textEmbedding, bokEmbeddings![j]);
-      const bm25Norm = bm25Scores[j] * bm25NormFactor;
+      const bm25Raw = bm25Scores[j];
+      const bm25Norm = bm25Raw > 0 ? 1 - Math.exp(-bm25Raw / BM25_NORM_SCALE) : 0;
       const hybridScore = (HYBRID_DENSE_WEIGHT * denseSim) + (HYBRID_BM25_WEIGHT * bm25Norm);
-      
-      if (hybridScore >= minThreshold) {
+
+      if (hybridScore >= MIN_HYBRID_THRESHOLD) {
         const conceptId = bokConceptIds![j];
         const existingMatch = bestMatchPerConcept.get(conceptId);
-        
+
         if (!existingMatch || hybridScore > existingMatch.similarity) {
           bestMatchPerConcept.set(conceptId, {
             conceptId,
@@ -304,14 +303,14 @@ async function handleClassify(data: any): Promise<void> {
             pageNumber: pageNumbers?.[i]
           });
         }
-        
+
         allSimilarities.push(hybridScore);
       }
     }
 
     const currentPercent = Math.floor(((i + 1) / textBlocks.length) * 100);
     const currentPercentRounded = Math.floor(currentPercent / 5) * 5;
-    
+
     if (currentPercentRounded > lastReportedPercent || i === textBlocks.length - 1) {
       lastReportedPercent = currentPercentRounded;
       postStatus('processing', { data: { total: textBlocks.length, current: i + 1 } });
@@ -342,6 +341,14 @@ self.addEventListener('message', async (event) => {
         postStatus('error', { error: `Unknown message type: ${type}` });
     }
   } catch (error: unknown) {
-    postStatus('error', { error: error instanceof Error ? error.message : 'Unknown error' });
+    console.error('[bok-matching.worker] Caught:', error);
+    const errorMsg = error instanceof Error
+      ? `${error.message}\n${error.stack ?? ''}`
+      : typeof error === 'string'
+        ? error
+        : typeof error === 'number'
+          ? `ONNX/WASM native error (pointer/code: ${error}). Likely invalid input encoding.`
+          : JSON.stringify(error, Object.getOwnPropertyNames(error ?? {}));
+    postStatus('error', { error: errorMsg });
   }
 });
