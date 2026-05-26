@@ -10,8 +10,8 @@ interface BokMatch {
 }
 
 // Hybrid weighting
-const HYBRID_DENSE_WEIGHT = 0.70;
-const HYBRID_BM25_WEIGHT = 0.30;
+const HYBRID_DENSE_WEIGHT = 0.75;
+const HYBRID_BM25_WEIGHT = 0.25;
 
 // BM25 configuration
 const BM25_K1 = 1.5;
