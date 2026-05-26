@@ -1,15 +1,8 @@
 import { Injectable } from '@angular/core';
 
 import * as pdfjsLib from 'pdfjs-dist';
-// @ts-expect-error - wordsninja ships without TypeScript types.
-import WordsNinjaPack from 'wordsninja';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-type WordsNinjaInstance = {
-  loadDictionary: () => Promise<void>;
-  splitSentence: (text: string, options?: { camelCaseSplitter?: boolean; joinWords?: boolean }) => string;
-};
 
 // Types
 export interface PageText {
@@ -25,7 +18,6 @@ export interface PdfTextExtractionResult {
 
 @Injectable({ providedIn: 'root' })
 export class PdfTextExtractorService {
-  private wordsNinja: WordsNinjaInstance | null = null;
 
   // Public methods
   async extractTextFromArrayBuffer(
@@ -46,7 +38,7 @@ export class PdfTextExtractorService {
 
       pages.push({
         pageNumber: pageNum,
-        text: await this.recoverSpaces(this.buildPageText(textContent))
+        text: this.buildPageText(textContent)
       });
 
       onProgress?.(pageNum, totalPages);
@@ -87,7 +79,7 @@ export class PdfTextExtractorService {
 
       pages.push({
         pageNumber: pageNum,
-        text: await this.recoverSpaces(this.buildPageText(textContent))
+        text: this.buildPageText(textContent)
       });
 
       onProgress?.(pageNum, totalPages);
@@ -153,22 +145,6 @@ export class PdfTextExtractorService {
     }
 
     return { textBlocks, pageNumbers };
-  }
-
-  private async ensureSegmenter(): Promise<WordsNinjaInstance> {
-    if (this.wordsNinja) return this.wordsNinja;
-    const instance: WordsNinjaInstance = new (WordsNinjaPack as unknown as new () => WordsNinjaInstance)();
-    await instance.loadDictionary();
-    this.wordsNinja = instance;
-    return instance;
-  }
-
-  private async recoverSpaces(text: string): Promise<string> {
-    if (!/[a-zA-Z]{16,}/.test(text)) return text;
-    const segmenter = await this.ensureSegmenter();
-    return text.replace(/[a-zA-Z]{16,}/g, (match) =>
-      segmenter.splitSentence(match, { camelCaseSplitter: true, joinWords: true })
-    );
   }
 
   private looksLikeAsciiArt(text: string): boolean {
