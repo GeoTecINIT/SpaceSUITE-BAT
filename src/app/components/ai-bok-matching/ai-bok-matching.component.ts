@@ -32,7 +32,7 @@ export class AiBokMatchingComponent {
 
   bokMatchingResult: BokClassificationResult | null = null;
   bokDataLoaded = false;
-  similarityThreshold = 0.8;
+  similarityThreshold = 0.75;
   selectedConcepts = new Set<string>();
   processingProgress: Progress = null;
   extractionProgress: Progress = null;
