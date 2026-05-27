@@ -10,8 +10,8 @@ interface BokMatch {
 }
 
 // Hybrid weighting
-const HYBRID_DENSE_WEIGHT = 0.75;
-const HYBRID_BM25_WEIGHT = 0.25;
+const HYBRID_DENSE_WEIGHT = 0.85;
+const HYBRID_BM25_WEIGHT = 0.15;
 
 // BM25 configuration
 const BM25_K1 = 1.5;
@@ -68,7 +68,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
 }
 
 function extractSentence(text: string, maxLength = 150): string {
-  const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 100);
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 50);
   const source = sentences.length > 0 ? sentences[0] : text;
   return source.length > maxLength ? source.substring(0, maxLength) + '...' : source;
 }

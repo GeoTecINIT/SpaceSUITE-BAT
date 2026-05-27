@@ -32,7 +32,7 @@ export class PdfTextExtractorService {
 
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       if (abortSignal?.aborted) throw new DOMException('Operation was aborted', 'AbortError');
-      
+
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
 
@@ -44,7 +44,8 @@ export class PdfTextExtractorService {
       onProgress?.(pageNum, totalPages);
     }
 
-    return { pages, totalPages, allText: pages.map(p => p.text).join('\n\n') };
+    const filteredPages = this.filterReferences(pages);
+    return { pages: filteredPages, totalPages, allText: filteredPages.map(p => p.text).join('\n\n') };
   }
 
   async extractTextFromFile(
@@ -85,7 +86,8 @@ export class PdfTextExtractorService {
       onProgress?.(pageNum, totalPages);
     }
 
-    return { pages, totalPages, allText: pages.map(p => p.text).join('\n\n') };
+    const filteredPages = this.filterReferences(pages);
+    return { pages: filteredPages, totalPages, allText: filteredPages.map(p => p.text).join('\n\n') };
   }
 
   splitIntoBlocks(pages: PageText[], maxBlockLength = 150): { textBlocks: string[]; pageNumbers: number[] } {
@@ -145,6 +147,17 @@ export class PdfTextExtractorService {
     }
 
     return { textBlocks, pageNumbers };
+  }
+
+  private filterReferences(pages: PageText[]): PageText[] {
+    const headingRegex = /^\s*(references?|bibliography|works\s+cited|literature\s+cited|referencias|bibliograf[ií]a)\s*:?\s*$/im;
+    const minIdx = Math.floor(pages.length / 2);
+    for (let i = pages.length - 1; i >= minIdx; i--) {
+      if (headingRegex.test(pages[i].text)) {
+        return pages.slice(0, i);
+      }
+    }
+    return pages;
   }
 
   private looksLikeAsciiArt(text: string): boolean {
