@@ -100,16 +100,20 @@ export class PdfTextExtractorService {
       const paragraphs = page.text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
 
       for (const paragraph of paragraphs) {
-        if (this.looksLikeAsciiArt(paragraph)) continue;
+        const artScore = this.asciiArtScore(paragraph);
+        if (artScore > 0.55) continue; // Maybe this is too high, but i want to save as much text as possible.
+                                      //  If the resulting text is to short, it will be filtered by the worker anyway (Currently set at 80 chars)
+        const processed = artScore > 0.05 ? this.cleanAsciiArt(paragraph) : paragraph;
+        if (!processed) continue;
 
-        if (paragraph.length <= maxBlockLength) {
-          textBlocks.push(paragraph);
+        if (processed.length <= maxBlockLength) {
+          textBlocks.push(processed);
           pageNumbers.push(page.pageNumber);
           continue;
         }
 
-        const sentences = paragraph.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
-        const sentenceList = sentences.length ? sentences : [paragraph];
+        const sentences = processed.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+        const sentenceList = sentences.length ? sentences : [processed];
 
         let currentBlock = '';
         for (const sentence of sentenceList) {
@@ -160,12 +164,20 @@ export class PdfTextExtractorService {
     return pages;
   }
 
-  private looksLikeAsciiArt(text: string): boolean {
-    if (!text) return false;
+  private asciiArtScore(text: string): number {
+    if (!text) return 0;
     const nonAlphaCount = (text.match(/[^a-zA-Z0-9\s]/g) ?? []).length;
     const nonAlphaRatio = nonAlphaCount / text.length;
-    const hasLongRunOfSymbols = /[-=_|+*~#]{6,}/.test(text);
-    return nonAlphaRatio > 0.35 || hasLongRunOfSymbols;
+    const hasLongRunOfSymbols = /[-=_|+*~#]{6,}/.test(text); // We want to clean this if nonAlphaRatio is not too high
+    return hasLongRunOfSymbols ? Math.max(nonAlphaRatio, 0.10) : nonAlphaRatio;
+  }
+
+  private cleanAsciiArt(text: string): string {
+    return text
+      .replace(/[|_=+*~#<>{}\[\]\\\/^@&`]/g, ' ')
+      .replace(/-{3,}/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private sanitizeText(text: string): string {

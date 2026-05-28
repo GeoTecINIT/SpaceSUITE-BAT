@@ -68,7 +68,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
 }
 
 function extractSentence(text: string, maxLength = 150): string {
-  const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 50);
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 80);
   const source = sentences.length > 0 ? sentences[0] : text;
   return source.length > maxLength ? source.substring(0, maxLength) + '...' : source;
 }
