@@ -102,7 +102,7 @@ export class PdfTextExtractorService {
       for (const paragraph of paragraphs) {
         const artScore = this.asciiArtScore(paragraph);
         if (artScore > 0.55) continue; // Maybe this is too high, but i want to save as much text as possible.
-                                      //  If the resulting text is to short, it will be filtered by the worker anyway (Currently set at 80 chars)
+                                      //  If the resulting text is to short, it will be filtered by the worker anyway (Currently set at 10 chars)
         const processed = artScore > 0.05 ? this.cleanAsciiArt(paragraph) : paragraph;
         if (!processed) continue;
 
