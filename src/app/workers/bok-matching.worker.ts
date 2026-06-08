@@ -9,35 +9,49 @@ interface BokMatch {
   pageNumber?: number;
 }
 
-// Hybrid weighting
-const HYBRID_DENSE_WEIGHT = 0.85;
-const HYBRID_BM25_WEIGHT = 0.15;
+type WorkerStatus = 'initiate' | 'progress' | 'ready' | 'processing' | 'complete' | 'error' | 'bok-loaded';
 
-// BM25 configuration
-const BM25_K1 = 1.5;
-const BM25_B = 0.7;
+interface LoadBokPayload {
+  embeddings: number[][];
+  conceptIds: string[];
+  conceptNames: string[];
+}
+
+interface ClassifyPayload {
+  textBlocks: string[];
+  pageNumbers?: number[];
+}
+
+// Hybrid weighting
+const HYBRID_DENSE_WEIGHT = 0.75; // Embedding similarity weight
+const HYBRID_LEXICAL_WEIGHT = 0.25; // Lexical score weight
+
+// Lexical title score
+const PERFECT_MATCH_WEIGHT = 0.3; //Bonus
+const LENGTH_SATURATION = 2; // Saturation point for the title-length factor (see computeLexicalScores).
 
 // Jaro-Winkler fuzzy token matching
-const JW_MIN_SIMILARITY = 0.94;
-const JW_PREFIX_SCALE = 0.05;
-const JW_MAX_PREFIX = 12;
-
-// Score normalization & thresholding
-const BM25_NORM_SCALE = 5.0;
-const MIN_HYBRID_THRESHOLD = 0.5;
+const JW_MIN_SIMILARITY = 0.94; // High threshold to avoid false positives (Fuzzy matching)
+const JW_PREFIX_SCALE = 0.05; // Small boost for common prefixes, up to JW_MAX_PREFIX characters
+const JW_MAX_PREFIX = 12; // Number of initial characters to consider for the prefix boost
 
 // State
 let bokEmbeddings: number[][] | null = null;
 let bokConceptIds: string[] | null = null;
 let bokConceptNames: string[] | null = null;
 
-// BM25 index state
-let bm25DocTermFreqs: Array<Map<string, number>> = [];
-let bm25DocLengths: number[] = [];
-let bm25AvgDocLength = 0;
-let bm25Idf = new Map<string, number>();
-let bm25DocFreq = new Map<string, number>();
-let bm25Terms: string[] = [];
+// Lexical index state
+let lexConceptTokens: string[][] = [];
+let lexConceptIdfSum: number[] = [];
+let lexVocab = new Set<string>();
+let lexIdf = new Map<string, number>();
+let lexMaxIdf = 0;
+
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'with',
+  'by', 'from', 'at', 'as', 'is', 'are', 'be', 'this', 'that', 'into',
+  'using', 'use', 'based', 'via'
+]);
 
 // Pipeline singleton
 class PipelineSingleton {
@@ -46,7 +60,8 @@ class PipelineSingleton {
   static instance: any = null;
 
   static async getInstance(progressCallback?: ProgressCallback) {
-    this.instance ??= await pipeline(this.task, this.model, { progress_callback: progressCallback });
+    // dtype 'q8' (8-bit) or full precision 'fp' (32-bit) can be set when loading the model. 8-bit is much faster and uses less memory, with minimal impact on similarity ranking.
+    this.instance ??= await pipeline(this.task, this.model, { progress_callback: progressCallback, dtype: 'q8' });
     return this.instance;
   }
 }
@@ -127,139 +142,117 @@ function jaroWinkler(a: string, b: string): number {
   return jaro + prefix * JW_PREFIX_SCALE * (1 - jaro);
 }
 
-function buildBm25Index(conceptIds: string[], conceptNames: string[]): void {
+function titleTokens(name: string): string[] {
+  return Array.from(new Set(tokenize(name).filter(t => !STOPWORDS.has(t))));
+}
+
+function buildLexicalIndex(conceptNames: string[]): void {
   const docCount = conceptNames.length;
-  bm25DocTermFreqs = new Array(docCount);
-  bm25DocLengths = new Array(docCount);
-  bm25Idf = new Map<string, number>();
-  bm25DocFreq = new Map<string, number>();
-  bm25Terms = [];
+  lexConceptTokens = new Array(docCount);
+  lexConceptIdfSum = new Array(docCount);
+  lexVocab = new Set<string>();
+  lexIdf = new Map<string, number>();
+  lexMaxIdf = 0;
 
   const docFreq = new Map<string, number>();
-  let totalLength = 0;
 
   for (let i = 0; i < docCount; i++) {
-    const id = conceptIds[i] ?? '';
-    const name = conceptNames[i] ?? '';
-    const tokens = tokenize(`${id} ${name}`);
-
-    const tf = new Map<string, number>();
+    const tokens = titleTokens(conceptNames[i] ?? '');
+    lexConceptTokens[i] = tokens;
     for (const token of tokens) {
-      tf.set(token, (tf.get(token) ?? 0) + 1);
-    }
-
-    bm25DocTermFreqs[i] = tf;
-    bm25DocLengths[i] = tokens.length;
-    totalLength += tokens.length;
-
-    const unique = new Set(tokens);
-    for (const token of unique) {
+      lexVocab.add(token);
       docFreq.set(token, (docFreq.get(token) ?? 0) + 1);
     }
   }
 
-  bm25AvgDocLength = docCount ? totalLength / docCount : 0;
-
-  bm25DocFreq = docFreq;
-  bm25Terms = Array.from(docFreq.keys());
-
   for (const [term, df] of docFreq.entries()) {
     const idf = Math.log(1 + (docCount - df + 0.5) / (df + 0.5));
-    bm25Idf.set(term, idf);
-  }
-}
-
-function computeBm25Scores(queryTokens: string[]): Float32Array {
-  const docCount = bm25DocTermFreqs.length;
-  const scores = new Float32Array(docCount);
-  if (!docCount || !bm25AvgDocLength || !queryTokens.length) {
-    return scores;
-  }
-
-  const uniqueTerms = Array.from(new Set(queryTokens));
-  const termMatches = new Map<string, Array<{ term: string; weight: number }>>();
-  const termIdf = new Map<string, number>();
-
-  for (const term of uniqueTerms) {
-    const matches: Array<{ term: string; weight: number }> = [];
-    for (const candidate of bm25Terms) {
-      const similarity = jaroWinkler(term, candidate);
-      if (similarity >= JW_MIN_SIMILARITY) {
-        matches.push({ term: candidate, weight: similarity });
-      }
-    }
-
-    if (!matches.length) continue;
-    termMatches.set(term, matches);
-
-    if (matches.length === 1 && matches[0].term === term) {
-      const exactIdf = bm25Idf.get(term);
-      if (exactIdf !== undefined) {
-        termIdf.set(term, exactIdf);
-        continue;
-      }
-    }
-
-    let bestIdf = 0;
-    for (const match of matches) {
-      const matchIdf = bm25Idf.get(match.term) ?? 0;
-      const effectiveIdf = matchIdf * match.weight;
-      if (effectiveIdf > bestIdf) bestIdf = effectiveIdf;
-    }
-    termIdf.set(term, bestIdf);
+    lexIdf.set(term, idf);
+    if (idf > lexMaxIdf) lexMaxIdf = idf;
   }
 
   for (let i = 0; i < docCount; i++) {
-    const tfMap = bm25DocTermFreqs[i];
-    const docLength = bm25DocLengths[i] ?? 0;
-    if (!tfMap || !docLength) continue;
+    lexConceptIdfSum[i] = lexConceptTokens[i].reduce((sum, t) => sum + (lexIdf.get(t) ?? 0), 0);
+  }
+}
 
-    let score = 0;
-    for (const term of uniqueTerms) {
-      const matches = termMatches.get(term);
-      if (!matches) continue;
+// Lexical score per concept: lengthFactor × (IDF-weighted coverage + full-match bonus).
+function computeLexicalScores(queryTokens: string[]): Float32Array {
+  const docCount = lexConceptTokens.length;
+  const scores = new Float32Array(docCount);
+  if (!docCount || !queryTokens.length || !lexVocab.size || !lexMaxIdf) {
+    return scores;
+  }
 
-      let tf = 0;
-      for (const match of matches) {
-        const termTf = tfMap.get(match.term) ?? 0;
-        if (termTf) tf += termTf * match.weight;
+  // Drop stopwords for coverage (doesn't add value).
+  const uniqueQuery = Array.from(new Set(queryTokens)).filter(t => !STOPWORDS.has(t));
+
+  // Title-vocabulary tokens present in the text.
+  const present = new Set<string>();
+  for (const q of uniqueQuery) {
+    if (lexVocab.has(q)) present.add(q);
+  }
+  for (const term of lexVocab) {
+    if (present.has(term)) continue;
+    for (const q of uniqueQuery) {
+      if (jaroWinkler(q, term) >= JW_MIN_SIMILARITY) {
+        present.add(term);
+        break;
       }
-
-      if (!tf) continue;
-      const idf = termIdf.get(term) ?? 0;
-      const denom = tf + BM25_K1 * (1 - BM25_B + BM25_B * (docLength / bm25AvgDocLength));
-      score += idf * ((tf * (BM25_K1 + 1)) / denom);
     }
+  }
 
-    scores[i] = score;
+  for (let i = 0; i < docCount; i++) {
+    const tokens = lexConceptTokens[i];
+    const total = tokens.length;
+    if (!total) continue;
+
+    let matched = 0;
+    let matchedIdf = 0;
+    for (const token of tokens) {
+      if (!present.has(token)) continue;
+      matched++;
+      matchedIdf += lexIdf.get(token) ?? 0;
+    }
+    if (!matched) continue;
+
+    // IDF-weighted coverage penalizes matching only common terms.
+    const coverage = matchedIdf / lexConceptIdfSum[i];
+    const perfect = matched === total ? 1 : 0;
+    // Length factor devalues short titles: a 1-word match is weaker than 2-of-3.
+    const lengthFactor = Math.min(total, LENGTH_SATURATION) / LENGTH_SATURATION;
+    scores[i] = lengthFactor * (coverage + PERFECT_MATCH_WEIGHT * perfect);
   }
 
   return scores;
 }
 
-function postStatus(status: string, data?: any): void {
+function postStatus(status: WorkerStatus, data?: Record<string, unknown>): void {
   self.postMessage({ status, ...data });
 }
 
 // Message handlers
-function handleLoadBok(data: any): void {
+function handleLoadBok(data: LoadBokPayload): void {
   bokEmbeddings = data.embeddings;
   bokConceptIds = data.conceptIds;
   bokConceptNames = data.conceptNames;
 
-  if (bokConceptIds && bokConceptNames) {
-    buildBm25Index(bokConceptIds, bokConceptNames);
+  if (bokConceptNames) {
+    buildLexicalIndex(bokConceptNames);
   }
 
   postStatus('bok-loaded', { data: { conceptCount: bokConceptIds?.length || 0 } });
 }
 
-async function handleClassify(data: any): Promise<void> {
+async function handleClassify(data: ClassifyPayload): Promise<void> {
   postStatus('initiate');
 
   if (!bokEmbeddings || !bokConceptIds || !bokConceptNames) {
     throw new Error('BoK embeddings not loaded. Please load BoK data first.');
   }
+  const embeddings = bokEmbeddings;
+  const conceptIds = bokConceptIds;
+  const conceptNames = bokConceptNames;
 
   const extractor = await PipelineSingleton.getInstance((progress) => {
     postStatus('progress', { data: progress });
@@ -269,7 +262,6 @@ async function handleClassify(data: any): Promise<void> {
 
   const { textBlocks, pageNumbers } = data;
   const bestMatchPerConcept = new Map<string, BokMatch>();
-  const allSimilarities: number[] = [];
   let lastReportedPercent = 0;
 
   postStatus('processing', { data: { total: textBlocks.length, current: 0 } });
@@ -279,32 +271,27 @@ async function handleClassify(data: any): Promise<void> {
     if (!text || text.trim().length < 10) continue;
 
     const queryTokens = tokenize(text);
-    const bm25Scores = computeBm25Scores(queryTokens);
+    const lexScores = computeLexicalScores(queryTokens);
 
     const output = await extractor(text, { pooling: 'mean', normalize: true });
     const textEmbedding = Array.from(output.data as Float32Array);
 
-    for (let j = 0; j < bokEmbeddings!.length; j++) {
-      const denseSim = cosineSimilarity(textEmbedding, bokEmbeddings![j]);
-      const bm25Raw = bm25Scores[j];
-      const bm25Norm = bm25Raw > 0 ? 1 - Math.exp(-bm25Raw / BM25_NORM_SCALE) : 0;
-      const hybridScore = (HYBRID_DENSE_WEIGHT * denseSim) + (HYBRID_BM25_WEIGHT * bm25Norm);
+    for (let j = 0; j < embeddings.length; j++) {
+      const denseSim = cosineSimilarity(textEmbedding, embeddings[j]);
+      const lexScore = lexScores[j];
+      const hybridScore = Math.min(1, (HYBRID_DENSE_WEIGHT * denseSim) + (HYBRID_LEXICAL_WEIGHT * lexScore));
 
-      if (hybridScore >= MIN_HYBRID_THRESHOLD) {
-        const conceptId = bokConceptIds![j];
-        const existingMatch = bestMatchPerConcept.get(conceptId);
+      const conceptId = conceptIds[j];
+      const existingMatch = bestMatchPerConcept.get(conceptId);
 
-        if (!existingMatch || hybridScore > existingMatch.similarity) {
-          bestMatchPerConcept.set(conceptId, {
-            conceptId,
-            conceptName: bokConceptNames![j],
-            similarity: hybridScore,
-            matchingSentence: extractSentence(text),
-            pageNumber: pageNumbers?.[i]
-          });
-        }
-
-        allSimilarities.push(hybridScore);
+      if (!existingMatch || hybridScore > existingMatch.similarity) {
+        bestMatchPerConcept.set(conceptId, {
+          conceptId,
+          conceptName: conceptNames[j],
+          similarity: hybridScore,
+          matchingSentence: extractSentence(text),
+          pageNumber: pageNumbers?.[i]
+        });
       }
     }
 
@@ -321,7 +308,7 @@ async function handleClassify(data: any): Promise<void> {
   const allMatches = Array.from(bestMatchPerConcept.values()).sort((a, b) => b.similarity - a.similarity);
 
   setTimeout(() => {
-    postStatus('complete', { output: { allMatches, allSimilarities } });
+    postStatus('complete', { output: { allMatches } });
   }, 1500);
 }
 
@@ -340,15 +327,7 @@ self.addEventListener('message', async (event) => {
       default:
         postStatus('error', { error: `Unknown message type: ${type}` });
     }
-  } catch (error: unknown) {
-    console.error('[bok-matching.worker] Caught:', error);
-    const errorMsg = error instanceof Error
-      ? `${error.message}\n${error.stack ?? ''}`
-      : typeof error === 'string'
-        ? error
-        : typeof error === 'number'
-          ? `ONNX/WASM native error (pointer/code: ${error}). Likely invalid input encoding.`
-          : JSON.stringify(error, Object.getOwnPropertyNames(error ?? {}));
-    postStatus('error', { error: errorMsg });
+  } catch {
+    postStatus('error', { error: 'An error occurred during processing.' });
   }
 });

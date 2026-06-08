@@ -13,15 +13,12 @@ export interface BokMatch {
 
 export interface BokRawClassificationResult {
   allMatches: BokMatch[];
-  allSimilarities: number[];
 }
 
 export interface BokClassificationResult {
-  allMatchedIds: string[];
   selectedIds: string[];
   matches: BokMatch[];
   totalMatches: number;
-  selectedMatches: number;
 }
 
 export interface BokData {

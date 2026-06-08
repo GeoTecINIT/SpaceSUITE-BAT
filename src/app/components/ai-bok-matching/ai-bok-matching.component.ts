@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
@@ -32,7 +32,8 @@ export class AiBokMatchingComponent {
 
   bokMatchingResult: BokClassificationResult | null = null;
   bokDataLoaded = false;
-  similarityThreshold = 0.75;
+  // Default similarity slider value; matches below it are hidden.
+  similarityThreshold = 0.70;
   selectedConcepts = new Set<string>();
   processingProgress: Progress = null;
   extractionProgress: Progress = null;
@@ -139,11 +140,12 @@ export class AiBokMatchingComponent {
       await this.delay(1500);
       this.processingProgress = null;
       
-      if (isStale() || !this.bokMatchingResult) return;
+      if (isStale()) return;         
+      this.isAnalyzing = false;
+      if (!this.bokMatchingResult) return;
       
       const result: BokClassificationResult = this.bokMatchingResult;
       this.selectedConcepts.clear();
-      this.isAnalyzing = false;
 
       const newCount = result.selectedIds.filter(id => !this.bokRelations.includes(id)).length;
       const msg = result.selectedIds.length
@@ -152,10 +154,9 @@ export class AiBokMatchingComponent {
       this.showMessage('info', 'Info', msg);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      console.error('PDF classification error:', error);
       this.extractionProgress = null;
       this.isAnalyzing = false;
-      this.showMessage('error', 'Error', error instanceof Error ? error.message : 'Unknown error');
+      this.showMessage('error', 'Error', 'An error occurred during analysis.');
     }
   }
 
@@ -194,8 +195,7 @@ export class AiBokMatchingComponent {
     try {
       await this.bokMatchingService.loadBokDataFromUrl('assets/bok-embeddings.json');
       this.bokDataLoaded = true;
-    } catch (error) {
-      console.error('Failed to load BoK data:', error);
+    } catch {
       this.showMessage('error', 'BoK Data Not Found', 'BoK embeddings file not found. AI classification unavailable.');
     } finally {
       this.isLoadingBokData = false;
@@ -215,11 +215,9 @@ export class AiBokMatchingComponent {
       : [];
 
     this.bokMatchingResult = {
-      allMatchedIds: thresholdFiltered.map(m => m.conceptId),
       selectedIds: selectedMatches.map(m => m.conceptId),
       matches: selectedMatches,
-      totalMatches: thresholdFiltered.length,
-      selectedMatches: selectedMatches.length
+      totalMatches: thresholdFiltered.length
     };
   }
 

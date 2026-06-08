@@ -48,48 +48,6 @@ export class PdfTextExtractorService {
     return { pages: filteredPages, totalPages, allText: filteredPages.map(p => p.text).join('\n\n') };
   }
 
-  async extractTextFromFile(
-    file: File,
-    onProgress?: (current: number, total: number) => void
-  ): Promise<PdfTextExtractionResult> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          resolve(await this.extractTextFromArrayBuffer(reader.result as ArrayBuffer, onProgress));
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to read PDF file'));
-      reader.readAsArrayBuffer(file);
-    });
-  }
-
-  async extractTextFromUrl(
-    url: string,
-    onProgress?: (current: number, total: number) => void
-  ): Promise<PdfTextExtractionResult> {
-    const pdf = await pdfjsLib.getDocument(url).promise;
-    const totalPages = pdf.numPages;
-    const pages: PageText[] = [];
-
-    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-
-      pages.push({
-        pageNumber: pageNum,
-        text: this.buildPageText(textContent)
-      });
-
-      onProgress?.(pageNum, totalPages);
-    }
-
-    const filteredPages = this.filterReferences(pages);
-    return { pages: filteredPages, totalPages, allText: filteredPages.map(p => p.text).join('\n\n') };
-  }
-
   splitIntoBlocks(pages: PageText[], maxBlockLength = 150): { textBlocks: string[]; pageNumbers: number[] } {
     const textBlocks: string[] = [];
     const pageNumbers: number[] = [];
@@ -150,7 +108,12 @@ export class PdfTextExtractorService {
       }
     }
 
-    return { textBlocks, pageNumbers };
+    return { textBlocks: textBlocks.map(b => this.joinHyphenated(b)), pageNumbers };
+  }
+
+  // Join a word split by a hyphen + whitespace (PDF line-break artifact): "exam- ple" / "exam-\nple" -> "example".
+  private joinHyphenated(text: string): string {
+    return text.replace(/(\S)-\s+(\S)/g, '$1$2');
   }
 
   private filterReferences(pages: PageText[]): PageText[] {
