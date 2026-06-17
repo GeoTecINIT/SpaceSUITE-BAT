@@ -44,7 +44,7 @@
     </ng-container>
     
     <!-- Processing Progress -->
-    <ng-container *ngIf="isProcessing && processingProgress">
+    <ng-container *ngIf="processingProgress">
         <p-progressbar [value]="calcPercent(processingProgress)" class="custom-progress-bar"/>
         <p-panel header="AI Processing Progress" class="custom-panel">
             <p class="m-0">Matching BoK | Block {{ processingProgress.current }}/{{ processingProgress.total }} ({{ calcPercent(processingProgress) }}%)</p>

@@ -117,7 +117,7 @@ export class AiBokMatchingComponent {
         this.extractionAbortController.signal
       );
       this.extractionAbortController = null;
-      
+
       if (isStale()) return;
       await this.delay(1500);
       this.extractionProgress = null;
@@ -138,9 +138,8 @@ export class AiBokMatchingComponent {
       
       this.applyFilters();
       await this.delay(1500);
-      this.processingProgress = null;
-      
-      if (isStale()) return;         
+
+      if (isStale()) return;
       this.isAnalyzing = false;
       if (!this.bokMatchingResult) return;
       

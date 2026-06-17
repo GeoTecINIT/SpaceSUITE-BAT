@@ -34,6 +34,7 @@ export class BokMatchingService implements OnDestroy {
   private worker: Worker | null = null;
   private bokDataLoaded = false;
   private cachedBokData: BokData | null = null;
+  private rejectClassify: ((reason?: unknown) => void) | null = null;
 
   readonly isModelLoading$ = this._isModelLoading.asObservable();
   readonly processingProgress$ = this._processingProgress.asObservable();
@@ -82,6 +83,7 @@ export class BokMatchingService implements OnDestroy {
     return new Promise((resolve, reject) => {
       if (!this.worker) return reject(new Error('Failed to initialize worker'));
 
+      this.rejectClassify = reject;
       this._isModelLoading.next(true);
       this._processingProgress.next(null);
 
@@ -94,9 +96,11 @@ export class BokMatchingService implements OnDestroy {
           this._isModelLoading.next(false);
           setTimeout(() => this._processingProgress.next(null), 1500);
           this.worker?.removeEventListener('message', handler);
+          this.rejectClassify = null;
           resolve(output);
         } else if (status === 'error') {
           this.worker?.removeEventListener('message', handler);
+          this.rejectClassify = null;
           this.terminateWorker();
           reject(new Error(error));
         }
@@ -104,6 +108,7 @@ export class BokMatchingService implements OnDestroy {
 
       this.worker.addEventListener('message', handler);
       this.worker.onerror = (e) => {
+        this.rejectClassify = null;
         this.terminateWorker();
         reject(new Error(`Worker error: ${e.message}`));
       };
@@ -120,6 +125,8 @@ export class BokMatchingService implements OnDestroy {
   }
 
   cancelProcessing(): void {
+    this.rejectClassify?.(new DOMException('Classification aborted', 'AbortError'));
+    this.rejectClassify = null;
     this.worker?.terminate();
     this.worker = null;
     this.bokDataLoaded = false;
