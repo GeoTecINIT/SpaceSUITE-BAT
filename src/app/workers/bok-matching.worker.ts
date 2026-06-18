@@ -311,6 +311,11 @@ async function handleClassify(data: ClassifyPayload): Promise<void> {
     }
   }
 
+  // Last block may be skipped by the <10 char filter, force 100%.
+  if (lastReportedPercent < 100) {
+    postStatus('processing', { data: { total: textBlocks.length, current: textBlocks.length } });
+  }
+
   const allMatches = Array.from(bestMatchPerConcept.values()).sort((a, b) => b.similarity - a.similarity);
 
   setTimeout(() => {
