@@ -27,13 +27,19 @@ const HYBRID_DENSE_WEIGHT = 0.75; // Embedding similarity weight
 const HYBRID_LEXICAL_WEIGHT = 0.25; // Lexical score weight
 
 // Lexical title score
-const PERFECT_MATCH_WEIGHT = 0.3; //Bonus
+const PERFECT_MATCH_WEIGHT = 0.3; //Bonus (With bonus total score might slightly exceed 1.0) that's why the value is capped at 1.0 in the computeLexicalScores function.
 const LENGTH_SATURATION = 2; // Saturation point for the title-length factor (see computeLexicalScores).
 
 // Jaro-Winkler fuzzy token matching
 const JW_MIN_SIMILARITY = 0.94; // High threshold to avoid false positives (Fuzzy matching)
+                              // Lower to 0.90 for including shorter tokens (e.g., "API" and "APIs") but may introduce false positives for longer tokens (e.g. "agile" and "fragile").
 const JW_PREFIX_SCALE = 0.05; // Small boost for common prefixes, up to JW_MAX_PREFIX characters
 const JW_MAX_PREFIX = 12; // Number of initial characters to consider for the prefix boost
+// For the scaling factor the normal values are JW_PREFIX_SCALE = 0.1 and JW_MAX_PREFIX = 4.
+
+// But I found that a smaller boost and longer prefix length works better for matching technical terms in BoK titles, which are often longer than typical words.
+// Besides since I used a large JW_MIN_SIMILARITY threshold, matches are either exact matches o large words with a slight variation.
+
 
 // State
 let bokEmbeddings: number[][] | null = null;
@@ -60,7 +66,7 @@ class PipelineSingleton {
   static instance: any = null;
 
   static async getInstance(progressCallback?: ProgressCallback) {
-    // dtype 'q8' (8-bit) or full precision 'fp' (32-bit) can be set when loading the model. 8-bit is much faster and uses less memory, with minimal impact on similarity ranking.
+    // dtype 'q8' (8-bit) or full precision 'fp32' (32-bit) can be set when loading the model. 8-bit is much faster and uses less memory, with minimal impact on similarity ranking.
     this.instance ??= await pipeline(this.task, this.model, { progress_callback: progressCallback, dtype: 'q8' });
     return this.instance;
   }
