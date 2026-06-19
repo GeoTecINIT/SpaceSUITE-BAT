@@ -161,15 +161,38 @@ export class PdfTextExtractorService {
   private buildPageText(textContent: any): string {
     const items = textContent?.items ?? [];
     let text = '';
+    let prevEndX: number | null = null;
+    let prevY: number | null = null;
 
     for (const item of items) {
       const str = this.sanitizeText(String(item?.str ?? ''));
+
       if (str) {
-        if (text && !text.endsWith('\n') && !text.endsWith(' ')) text += ' ';
+        const t = Array.isArray(item?.transform) ? item.transform : null;
+        const x = t ? t[4] : null;
+        const y = t ? t[5] : null;
+        const fontSize = t ? (Math.hypot(t[2], t[3]) || Math.abs(t[3])) : 0;
+
+        if (text && !text.endsWith('\n') && !text.endsWith(' ')) {
+          // Add a space only when items are visually apart, not when a word was split
+          // into runs (cairo emits ligatures like "ﬂ" as their own item -> "work fl ow").
+          const insertSpace =
+            x == null || prevEndX == null || prevY == null
+              ? true // no geometry: keep old spacing behaviour
+              : Math.abs((y ?? 0) - prevY) > fontSize * 0.5 // different line
+                || x - prevEndX > fontSize * 0.2;            // real horizontal gap
+          if (insertSpace) text += ' ';
+        }
+
         text += str;
+        if (x != null) prevEndX = x + (item?.width ?? 0);
+        if (y != null) prevY = y;
       }
+
       if (item?.hasEOL) {
         text += '\n';
+        prevEndX = null;
+        prevY = null;
       }
     }
 
