@@ -91,10 +91,8 @@ export class AiBokMatchingComponent {
     this.processingProgress = null;
     this.isProcessing = false;
     this.isAnalyzing = false;
-    this.bokDataLoaded = false;
     this.rawMatchData = null;
     this.showMessage('error', 'Cancelled', 'PDF analysis was cancelled.');
-    this.loadBokData();
   }
 
   async classifyPdfContent(): Promise<void> {
