@@ -27,10 +27,11 @@
     </div>
 
     <!-- Analyze Button -->
-    <div class="flex gap-2">
+    <div class="flex gap-3">
         <p-button label="Analyze PDF Content" icon="pi pi-search" (click)="classifyPdfContent()"
             [disabled]="!bokDataLoaded || !pdfDoc || isAnalyzing"
-            [loading]="isExtracting || isProcessing" class="flex-1 custom-button" size="large"/>
+            [loading]="isExtracting || isProcessing" class="custom-button" size="large"/>
+        <div class="flex-1"></div>
         <p-button *ngIf="isAnalyzing" label="Cancel" icon="pi pi-times" severity="danger"
             (click)="cancelAnalysis()" size="large"/>
     </div>
