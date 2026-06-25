@@ -9,7 +9,7 @@ interface BokMatch {
   pageNumber?: number;
 }
 
-type WorkerStatus = 'initiate' | 'progress' | 'ready' | 'processing' | 'complete' | 'error' | 'bok-loaded';
+type WorkerStatus = 'progress' | 'processing' | 'complete' | 'error' | 'bok-loaded';
 
 interface LoadBokPayload {
   embeddings: number[][];
@@ -251,7 +251,6 @@ function handleLoadBok(data: LoadBokPayload): void {
 }
 
 async function handleClassify(data: ClassifyPayload): Promise<void> {
-  postStatus('initiate');
 
   if (!bokEmbeddings || !bokConceptIds || !bokConceptNames) {
     throw new Error('BoK embeddings not loaded. Please load BoK data first.');
@@ -260,17 +259,22 @@ async function handleClassify(data: ClassifyPayload): Promise<void> {
   const conceptIds = bokConceptIds;
   const conceptNames = bokConceptNames;
 
+  let lastPercent = -1;
   const extractor = await PipelineSingleton.getInstance((progress) => {
-    postStatus('progress', { data: progress });
+    if (progress.status !== 'progress' || !progress.file.endsWith('.onnx')) return;
+    const percent = Math.floor(progress.progress / 5) * 5;
+    if (percent <= lastPercent) return;
+    lastPercent = percent;
+    postStatus('progress', { data: { percent } });
   });
 
-  postStatus('ready');
+  if (lastPercent > -1) await new Promise(resolve => setTimeout(resolve, 1500));
 
   const { textBlocks, pageNumbers } = data;
   const bestMatchPerConcept = new Map<string, BokMatch>();
   let lastReportedPercent = 0;
 
-  postStatus('processing', { data: { total: textBlocks.length, current: 0 } });
+  postStatus('processing', { data: { current: 0, total: textBlocks.length } });
 
   for (let i = 0; i < textBlocks.length; i++) {
     const text = textBlocks[i];
@@ -306,14 +310,14 @@ async function handleClassify(data: ClassifyPayload): Promise<void> {
 
     if (currentPercentRounded > lastReportedPercent || i === textBlocks.length - 1) {
       lastReportedPercent = currentPercentRounded;
-      postStatus('processing', { data: { total: textBlocks.length, current: i + 1 } });
+      postStatus('processing', { data: { current: i + 1, total: textBlocks.length } });
       await new Promise(resolve => setTimeout(resolve, 0));
     }
   }
 
   // Last block may be skipped by the <10 char filter, force 100%.
   if (lastReportedPercent < 100) {
-    postStatus('processing', { data: { total: textBlocks.length, current: textBlocks.length } });
+    postStatus('processing', { data: { current: textBlocks.length, total: textBlocks.length } });
   }
 
   const allMatches = Array.from(bestMatchPerConcept.values()).sort((a, b) => b.similarity - a.similarity);

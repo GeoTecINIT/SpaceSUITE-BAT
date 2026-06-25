@@ -44,6 +44,14 @@
         </p-panel>
     </ng-container>
     
+    <!-- Model Download Progress -->
+    <ng-container *ngIf="modelLoadProgress !== null">
+        <p-progressbar [value]="modelLoadProgress" class="custom-progress-bar"/>
+        <p-panel header="AI Model Download" class="custom-panel">
+            <p class="m-0">Downloading model | {{ modelLoadProgress }}%</p>
+        </p-panel>
+    </ng-container>
+
     <!-- Processing Progress -->
     <ng-container *ngIf="processingProgress">
         <p-progressbar [value]="calcPercent(processingProgress)" class="custom-progress-bar"/>

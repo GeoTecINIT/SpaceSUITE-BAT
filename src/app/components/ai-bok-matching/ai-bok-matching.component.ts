@@ -35,6 +35,7 @@ export class AiBokMatchingComponent {
   // Default similarity slider value; matches below it are hidden.
   similarityThreshold = 0.70;
   selectedConcepts = new Set<string>();
+  modelLoadProgress: number | null = null;
   processingProgress: Progress = null;
   extractionProgress: Progress = null;
   isProcessing = false;
@@ -55,6 +56,7 @@ export class AiBokMatchingComponent {
   // Lifecycle hooks
   ngOnInit(): void {
     this.subscriptions.push(
+      this.bokMatchingService.modelLoadProgress$.subscribe(p => this.modelLoadProgress = p),
       this.bokMatchingService.processingProgress$.subscribe(p => this.processingProgress = p),
       this.bokMatchingService.isModelLoading$.subscribe(l => this.isProcessing = l)
     );
@@ -88,6 +90,7 @@ export class AiBokMatchingComponent {
     this.extractionAbortController = null;
     this.bokMatchingService.cancelProcessing();
     this.extractionProgress = null;
+    this.modelLoadProgress = null;
     this.processingProgress = null;
     this.isProcessing = false;
     this.isAnalyzing = false;

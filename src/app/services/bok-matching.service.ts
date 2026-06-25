@@ -30,6 +30,7 @@ export interface BokData {
 @Injectable({ providedIn: 'root' })
 export class BokMatchingService implements OnDestroy {
   private readonly _isModelLoading = new BehaviorSubject<boolean>(false);
+  private readonly _modelLoadProgress = new BehaviorSubject<number | null>(null);
   private readonly _processingProgress = new BehaviorSubject<{ current: number; total: number } | null>(null);
   private worker: Worker | null = null;
   private bokDataLoaded = false;
@@ -37,6 +38,7 @@ export class BokMatchingService implements OnDestroy {
   private rejectClassify: ((reason?: unknown) => void) | null = null;
 
   readonly isModelLoading$ = this._isModelLoading.asObservable();
+  readonly modelLoadProgress$ = this._modelLoadProgress.asObservable();
   readonly processingProgress$ = this._processingProgress.asObservable();
 
   // Lifecycle
@@ -85,15 +87,20 @@ export class BokMatchingService implements OnDestroy {
 
       this.rejectClassify = reject;
       this._isModelLoading.next(true);
+      this._modelLoadProgress.next(null);
       this._processingProgress.next(null);
 
       const handler = (event: MessageEvent) => {
         const { status, output, error, data } = event.data;
 
-        if (status === 'processing') {
+        if (status === 'progress') {
+          this._modelLoadProgress.next(data.percent);
+        } else if (status === 'processing') {
+          this._modelLoadProgress.next(null);
           this._processingProgress.next({ current: data.current, total: data.total });
         } else if (status === 'complete') {
           this._isModelLoading.next(false);
+          this._modelLoadProgress.next(null);
           setTimeout(() => this._processingProgress.next(null), 1500);
           this.worker?.removeEventListener('message', handler);
           this.rejectClassify = null;
@@ -147,6 +154,7 @@ export class BokMatchingService implements OnDestroy {
 
   private resetState(): void {
     this._isModelLoading.next(false);
+    this._modelLoadProgress.next(null);
     this._processingProgress.next(null);
   }
 }
