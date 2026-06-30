@@ -9,10 +9,55 @@ interface BokMatch {
   pageNumber?: number;
 }
 
+type WorkerStatus = 'progress' | 'processing' | 'complete' | 'error' | 'bok-loaded';
+
+interface LoadBokPayload {
+  embeddings: number[][];
+  conceptIds: string[];
+  conceptNames: string[];
+}
+
+interface ClassifyPayload {
+  textBlocks: string[];
+  pageNumbers?: number[];
+}
+
+// Hybrid weighting
+const HYBRID_DENSE_WEIGHT = 0.75; // Embedding similarity weight
+const HYBRID_LEXICAL_WEIGHT = 0.25; // Lexical score weight
+
+// Lexical title score
+const PERFECT_MATCH_WEIGHT = 0.3; //Bonus (With bonus total score might slightly exceed 1.0) that's why the value is capped at 1.0 in the computeLexicalScores function.
+const LENGTH_SATURATION = 2; // Saturation point for the title-length factor (see computeLexicalScores).
+
+// Jaro-Winkler fuzzy token matching
+const JW_MIN_SIMILARITY = 0.94; // High threshold to avoid false positives (Fuzzy matching)
+                              // Lower to 0.90 for including shorter tokens (e.g., "API" and "APIs") but may introduce false positives for longer tokens (e.g. "agile" and "fragile").
+const JW_PREFIX_SCALE = 0.05; // Small boost for common prefixes, up to JW_MAX_PREFIX characters
+const JW_MAX_PREFIX = 12; // Number of initial characters to consider for the prefix boost
+// For the scaling factor the normal values are JW_PREFIX_SCALE = 0.1 and JW_MAX_PREFIX = 4.
+
+// But I found that a smaller boost and longer prefix length works better for matching technical terms in BoK titles, which are often longer than typical words.
+// Besides since I used a large JW_MIN_SIMILARITY threshold, matches are either exact matches o large words with a slight variation.
+
+
 // State
 let bokEmbeddings: number[][] | null = null;
 let bokConceptIds: string[] | null = null;
 let bokConceptNames: string[] | null = null;
+
+// Lexical index state
+let lexConceptTokens: string[][] = [];
+let lexConceptIdfSum: number[] = [];
+let lexVocab = new Set<string>();
+let lexIdf = new Map<string, number>();
+let lexMaxIdf = 0;
+
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'with',
+  'by', 'from', 'at', 'as', 'is', 'are', 'be', 'this', 'that', 'into',
+  'using', 'use', 'based', 'via'
+]);
 
 // Pipeline singleton
 class PipelineSingleton {
@@ -21,7 +66,8 @@ class PipelineSingleton {
   static instance: any = null;
 
   static async getInstance(progressCallback?: ProgressCallback) {
-    this.instance ??= await pipeline(this.task, this.model, { progress_callback: progressCallback });
+    // dtype 'q8' (8-bit) or full precision 'fp32' (32-bit) can be set when loading the model. 8-bit is much faster and uses less memory, with minimal impact on similarity ranking.
+    this.instance ??= await pipeline(this.task, this.model, { progress_callback: progressCallback, dtype: 'q8' });
     return this.instance;
   }
 }
@@ -29,101 +75,255 @@ class PipelineSingleton {
 // Utility functions
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   let dotProduct = 0, normA = 0, normB = 0;
-  
+
   for (let i = 0; i < vecA.length; i++) {
     dotProduct += vecA[i] * vecB[i];
     normA += vecA[i] * vecA[i];
     normB += vecB[i] * vecB[i];
   }
-  
+
   normA = Math.sqrt(normA);
   normB = Math.sqrt(normB);
-  
+
   return (normA === 0 || normB === 0) ? 0 : dotProduct / (normA * normB);
 }
 
 function extractSentence(text: string, maxLength = 150): string {
-  const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 100);
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 80);
   const source = sentences.length > 0 ? sentences[0] : text;
   return source.length > maxLength ? source.substring(0, maxLength) + '...' : source;
 }
 
-function postStatus(status: string, data?: any): void {
+function tokenize(text: string): string[] {
+  const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return normalized ? normalized.split(/\s+/).filter(t => t.length > 1) : [];
+}
+
+function jaroWinkler(a: string, b: string): number {
+  if (a === b) return 1;
+
+  const lenA = a.length;
+  const lenB = b.length;
+  if (!lenA || !lenB) return 0;
+
+  const matchDistance = Math.max(0, Math.floor(Math.max(lenA, lenB) / 2) - 1);
+  const aMatches = new Array<boolean>(lenA).fill(false);
+  const bMatches = new Array<boolean>(lenB).fill(false);
+
+  let matches = 0;
+  for (let i = 0; i < lenA; i++) {
+    const start = Math.max(0, i - matchDistance);
+    const end = Math.min(i + matchDistance + 1, lenB);
+
+    for (let j = start; j < end; j++) {
+      if (bMatches[j]) continue;
+      if (a[i] !== b[j]) continue;
+      aMatches[i] = true;
+      bMatches[j] = true;
+      matches++;
+      break;
+    }
+  }
+
+  if (!matches) return 0;
+
+  let transpositions = 0;
+  let k = 0;
+  for (let i = 0; i < lenA; i++) {
+    if (!aMatches[i]) continue;
+    while (!bMatches[k]) k++;
+    if (a[i] !== b[k]) transpositions++;
+    k++;
+  }
+
+  const halfTranspositions = transpositions / 2;
+  const jaro = (matches / lenA + matches / lenB + (matches - halfTranspositions) / matches) / 3;
+
+  let prefix = 0;
+  const maxPrefix = Math.min(JW_MAX_PREFIX, lenA, lenB);
+  while (prefix < maxPrefix && a[prefix] === b[prefix]) {
+    prefix++;
+  }
+
+  return jaro + prefix * JW_PREFIX_SCALE * (1 - jaro);
+}
+
+function titleTokens(name: string): string[] {
+  return Array.from(new Set(tokenize(name).filter(t => !STOPWORDS.has(t))));
+}
+
+function buildLexicalIndex(conceptNames: string[]): void {
+  const docCount = conceptNames.length;
+  lexConceptTokens = new Array(docCount);
+  lexConceptIdfSum = new Array(docCount);
+  lexVocab = new Set<string>();
+  lexIdf = new Map<string, number>();
+  lexMaxIdf = 0;
+
+  const docFreq = new Map<string, number>();
+
+  for (let i = 0; i < docCount; i++) {
+    const tokens = titleTokens(conceptNames[i] ?? '');
+    lexConceptTokens[i] = tokens;
+    for (const token of tokens) {
+      lexVocab.add(token);
+      docFreq.set(token, (docFreq.get(token) ?? 0) + 1);
+    }
+  }
+
+  for (const [term, df] of docFreq.entries()) {
+    const idf = Math.log(1 + (docCount - df + 0.5) / (df + 0.5));
+    lexIdf.set(term, idf);
+    if (idf > lexMaxIdf) lexMaxIdf = idf;
+  }
+
+  for (let i = 0; i < docCount; i++) {
+    lexConceptIdfSum[i] = lexConceptTokens[i].reduce((sum, t) => sum + (lexIdf.get(t) ?? 0), 0);
+  }
+}
+
+// Lexical score per concept: lengthFactor × (IDF-weighted coverage + full-match bonus).
+function computeLexicalScores(queryTokens: string[]): Float32Array {
+  const docCount = lexConceptTokens.length;
+  const scores = new Float32Array(docCount);
+  if (!docCount || !queryTokens.length || !lexVocab.size || !lexMaxIdf) {
+    return scores;
+  }
+
+  // Drop stopwords for coverage (doesn't add value).
+  const uniqueQuery = Array.from(new Set(queryTokens)).filter(t => !STOPWORDS.has(t));
+
+  // Title-vocabulary tokens present in the text.
+  const present = new Set<string>();
+  for (const q of uniqueQuery) {
+    if (lexVocab.has(q)) present.add(q);
+  }
+  for (const term of lexVocab) {
+    if (present.has(term)) continue;
+    for (const q of uniqueQuery) {
+      if (jaroWinkler(q, term) >= JW_MIN_SIMILARITY) {
+        present.add(term);
+        break;
+      }
+    }
+  }
+
+  for (let i = 0; i < docCount; i++) {
+    const tokens = lexConceptTokens[i];
+    const total = tokens.length;
+    if (!total) continue;
+
+    let matched = 0;
+    let matchedIdf = 0;
+    for (const token of tokens) {
+      if (!present.has(token)) continue;
+      matched++;
+      matchedIdf += lexIdf.get(token) ?? 0;
+    }
+    if (!matched) continue;
+
+    // IDF-weighted coverage penalizes matching only common terms.
+    const coverage = matchedIdf / lexConceptIdfSum[i];
+    const perfect = matched === total ? 1 : 0;
+    // Length factor devalues short titles: a 1-word match is weaker than 2-of-3.
+    const lengthFactor = Math.min(total, LENGTH_SATURATION) / LENGTH_SATURATION;
+    scores[i] = lengthFactor * (coverage + PERFECT_MATCH_WEIGHT * perfect);
+  }
+
+  return scores;
+}
+
+function postStatus(status: WorkerStatus, data?: Record<string, unknown>): void {
   self.postMessage({ status, ...data });
 }
 
 // Message handlers
-function handleLoadBok(data: any): void {
+function handleLoadBok(data: LoadBokPayload): void {
   bokEmbeddings = data.embeddings;
   bokConceptIds = data.conceptIds;
   bokConceptNames = data.conceptNames;
-  
+
+  if (bokConceptNames) {
+    buildLexicalIndex(bokConceptNames);
+  }
+
   postStatus('bok-loaded', { data: { conceptCount: bokConceptIds?.length || 0 } });
 }
 
-async function handleClassify(data: any): Promise<void> {
-  postStatus('initiate');
+async function handleClassify(data: ClassifyPayload): Promise<void> {
 
   if (!bokEmbeddings || !bokConceptIds || !bokConceptNames) {
     throw new Error('BoK embeddings not loaded. Please load BoK data first.');
   }
+  const embeddings = bokEmbeddings;
+  const conceptIds = bokConceptIds;
+  const conceptNames = bokConceptNames;
 
+  let lastPercent = -1;
   const extractor = await PipelineSingleton.getInstance((progress) => {
-    postStatus('progress', { data: progress });
+    if (progress.status !== 'progress' || !progress.file.endsWith('.onnx')) return;
+    const percent = Math.floor(progress.progress / 5) * 5;
+    if (percent <= lastPercent) return;
+    lastPercent = percent;
+    postStatus('progress', { data: { percent } });
   });
 
-  postStatus('ready');
+  if (lastPercent > -1) await new Promise(resolve => setTimeout(resolve, 1500));
 
   const { textBlocks, pageNumbers } = data;
-  const minThreshold = 0.5;
   const bestMatchPerConcept = new Map<string, BokMatch>();
-  const allSimilarities: number[] = [];
   let lastReportedPercent = 0;
 
-  postStatus('processing', { data: { total: textBlocks.length, current: 0 } });
+  postStatus('processing', { data: { current: 0, total: textBlocks.length } });
 
   for (let i = 0; i < textBlocks.length; i++) {
     const text = textBlocks[i];
     if (!text || text.trim().length < 10) continue;
-    
+
+    const queryTokens = tokenize(text);
+    const lexScores = computeLexicalScores(queryTokens);
+
     const output = await extractor(text, { pooling: 'mean', normalize: true });
     const textEmbedding = Array.from(output.data as Float32Array);
 
-    for (let j = 0; j < bokEmbeddings!.length; j++) {
-      const sim = cosineSimilarity(textEmbedding, bokEmbeddings![j]);
-      
-      if (sim >= minThreshold) {
-        const conceptId = bokConceptIds![j];
-        const existingMatch = bestMatchPerConcept.get(conceptId);
-        
-        if (!existingMatch || sim > existingMatch.similarity) {
-          bestMatchPerConcept.set(conceptId, {
-            conceptId,
-            conceptName: bokConceptNames![j],
-            similarity: sim,
-            matchingSentence: extractSentence(text),
-            pageNumber: pageNumbers?.[i]
-          });
-        }
-        
-        allSimilarities.push(sim);
+    for (let j = 0; j < embeddings.length; j++) {
+      const denseSim = cosineSimilarity(textEmbedding, embeddings[j]);
+      const lexScore = lexScores[j];
+      const hybridScore = Math.min(1, (HYBRID_DENSE_WEIGHT * denseSim) + (HYBRID_LEXICAL_WEIGHT * lexScore));
+
+      const conceptId = conceptIds[j];
+      const existingMatch = bestMatchPerConcept.get(conceptId);
+
+      if (!existingMatch || hybridScore > existingMatch.similarity) {
+        bestMatchPerConcept.set(conceptId, {
+          conceptId,
+          conceptName: conceptNames[j],
+          similarity: hybridScore,
+          matchingSentence: extractSentence(text),
+          pageNumber: pageNumbers?.[i]
+        });
       }
     }
 
     const currentPercent = Math.floor(((i + 1) / textBlocks.length) * 100);
     const currentPercentRounded = Math.floor(currentPercent / 5) * 5;
-    
+
     if (currentPercentRounded > lastReportedPercent || i === textBlocks.length - 1) {
       lastReportedPercent = currentPercentRounded;
-      postStatus('processing', { data: { total: textBlocks.length, current: i + 1 } });
+      postStatus('processing', { data: { current: i + 1, total: textBlocks.length } });
       await new Promise(resolve => setTimeout(resolve, 0));
     }
+  }
+
+  // Last block may be skipped by the <10 char filter, force 100%.
+  if (lastReportedPercent < 100) {
+    postStatus('processing', { data: { current: textBlocks.length, total: textBlocks.length } });
   }
 
   const allMatches = Array.from(bestMatchPerConcept.values()).sort((a, b) => b.similarity - a.similarity);
 
   setTimeout(() => {
-    postStatus('complete', { output: { allMatches, allSimilarities } });
+    postStatus('complete', { output: { allMatches } });
   }, 1500);
 }
 
@@ -142,7 +342,7 @@ self.addEventListener('message', async (event) => {
       default:
         postStatus('error', { error: `Unknown message type: ${type}` });
     }
-  } catch (error: unknown) {
-    postStatus('error', { error: error instanceof Error ? error.message : 'Unknown error' });
+  } catch {
+    postStatus('error', { error: 'An error occurred during processing.' });
   }
 });

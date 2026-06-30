@@ -13,17 +13,12 @@ export interface BokMatch {
 
 export interface BokRawClassificationResult {
   allMatches: BokMatch[];
-  allSimilarities: number[];
 }
 
 export interface BokClassificationResult {
-  allMatchedIds: string[];
   selectedIds: string[];
   matches: BokMatch[];
-  percentileThreshold: number | null;
-  topPercentile: number;
   totalMatches: number;
-  selectedMatches: number;
 }
 
 export interface BokData {
@@ -35,16 +30,20 @@ export interface BokData {
 @Injectable({ providedIn: 'root' })
 export class BokMatchingService implements OnDestroy {
   private readonly _isModelLoading = new BehaviorSubject<boolean>(false);
+  private readonly _modelLoadProgress = new BehaviorSubject<number | null>(null);
   private readonly _processingProgress = new BehaviorSubject<{ current: number; total: number } | null>(null);
   private worker: Worker | null = null;
   private bokDataLoaded = false;
+  private cachedBokData: BokData | null = null;
+  private rejectClassify: ((reason?: unknown) => void) | null = null;
 
   readonly isModelLoading$ = this._isModelLoading.asObservable();
+  readonly modelLoadProgress$ = this._modelLoadProgress.asObservable();
   readonly processingProgress$ = this._processingProgress.asObservable();
 
   // Lifecycle
-  ngOnDestroy(): void { 
-    this.terminateWorker(); 
+  ngOnDestroy(): void {
+    this.terminateWorker();
   }
 
   // Public methods
@@ -57,6 +56,7 @@ export class BokMatchingService implements OnDestroy {
         const { status, data, error } = event.data;
         if (status === 'bok-loaded') {
           this.bokDataLoaded = true;
+          this.cachedBokData = bokData;
           this.worker?.removeEventListener('message', handler);
           resolve(data.conceptCount);
         } else if (status === 'error') {
@@ -76,41 +76,64 @@ export class BokMatchingService implements OnDestroy {
     return this.loadBokData(await response.json());
   }
 
-  classifyText(textBlocks: string[], pageNumbers?: number[]): Promise<BokRawClassificationResult> {
+  async classifyText(textBlocks: string[], pageNumbers?: number[]): Promise<BokRawClassificationResult> {
+    if (!textBlocks?.length) throw new Error('Text blocks cannot be empty');
+    if (!this.bokDataLoaded && !this.cachedBokData) throw new Error('BoK data not loaded');
+
+    await this.ensureWorkerReady();
+
     return new Promise((resolve, reject) => {
-      if (!textBlocks?.length) return reject(new Error('Text blocks cannot be empty'));
-      if (!this.bokDataLoaded) return reject(new Error('BoK data not loaded'));
-      
-      this.initializeWorker();
       if (!this.worker) return reject(new Error('Failed to initialize worker'));
 
+      this.rejectClassify = reject;
       this._isModelLoading.next(true);
+      this._modelLoadProgress.next(null);
       this._processingProgress.next(null);
 
       const handler = (event: MessageEvent) => {
         const { status, output, error, data } = event.data;
 
-        if (status === 'processing') {
+        if (status === 'progress') {
+          this._modelLoadProgress.next(data.percent);
+        } else if (status === 'processing') {
+          this._modelLoadProgress.next(null);
           this._processingProgress.next({ current: data.current, total: data.total });
         } else if (status === 'complete') {
           this._isModelLoading.next(false);
+          this._modelLoadProgress.next(null);
           setTimeout(() => this._processingProgress.next(null), 1500);
           this.worker?.removeEventListener('message', handler);
+          this.rejectClassify = null;
           resolve(output);
         } else if (status === 'error') {
-          this.resetState();
           this.worker?.removeEventListener('message', handler);
+          this.rejectClassify = null;
+          this.terminateWorker();
           reject(new Error(error));
         }
       };
 
       this.worker.addEventListener('message', handler);
-      this.worker.onerror = (e) => { this.resetState(); reject(new Error(`Worker error: ${e.message}`)); };
+      this.worker.onerror = (e) => {
+        this.rejectClassify = null;
+        this.terminateWorker();
+        reject(new Error(`Worker error: ${e.message}`));
+      };
       this.worker.postMessage({ type: 'classify', data: { textBlocks, pageNumbers } });
     });
   }
 
+  private async ensureWorkerReady(): Promise<void> {
+    if (this.bokDataLoaded && this.worker) return;
+    if (!this.cachedBokData) {
+      throw new Error('BoK data not loaded — call loadBokData first');
+    }
+    await this.loadBokData(this.cachedBokData);
+  }
+
   cancelProcessing(): void {
+    this.rejectClassify?.(new DOMException('Classification aborted', 'AbortError'));
+    this.rejectClassify = null;
     this.worker?.terminate();
     this.worker = null;
     this.bokDataLoaded = false;
@@ -131,6 +154,7 @@ export class BokMatchingService implements OnDestroy {
 
   private resetState(): void {
     this._isModelLoading.next(false);
+    this._modelLoadProgress.next(null);
     this._processingProgress.next(null);
   }
 }
