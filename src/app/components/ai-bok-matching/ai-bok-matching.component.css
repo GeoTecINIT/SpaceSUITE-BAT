@@ -19,6 +19,7 @@
 
 .custom-slider {
   --p-slider-range-background: var(--secondary-color);
+  --p-slider-handle-focus-ring-color: var(--secondary-color);
 }
 
 ::ng-deep .p-tooltip {
@@ -28,4 +29,54 @@
 .custom-panel {
   --p-panel-color: var(--primary-color);
   --p-panel-header-color: var(--primary-color); 
+}
+
+.custom-message {
+  --p-message-info-background: color-mix(in srgb, var(--secondary-color) 10%, rgba(255, 255, 255, 0.9) 90%);;
+  --p-message-info-border-color: var(--secondary-color);
+  --p-message-info-color: var(--primary-color);
+}
+
+:host ::ng-deep .custom-message .p-message-content .p-message-text {
+  flex-grow: 1 !important;
+}
+
+.custom-chip {
+  color: var(--primary-color);
+}
+
+.custom-chip:hover {
+  transform: scale(1.02);
+}
+
+.disabled-chip {
+  filter: grayscale(1);
+  background: rgb(200, 200, 200) !important;
+  cursor: not-allowed !important;
+}
+
+.disabled-chip:hover {
+  transform: scale(1);
+}
+
+.selected-chip {
+  border: 2px solid var(--primary-color);
+  transform: scale(1.02);
+}
+
+.unselected-chip {
+  border: 2px solid transparent;
+}
+
+.cdk-drag-placeholder {
+  filter: grayscale(1);
+  border: 2px solid var(--primary-color);
+  transform: scale(1.02);
+  background: rgb(200, 200, 200) !important;
+}
+
+
+.cdk-drag-preview {
+  border: 2px solid var(--primary-color);
+  transform: scale(1.02);
 }

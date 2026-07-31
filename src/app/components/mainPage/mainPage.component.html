@@ -6,7 +6,7 @@
             <p-button class="docs-button m-3 mx-0" *ngIf="logged" variant="text" label="My Documents" 
                     icon="pi pi-file" (click)="navigateToMyDocs()" [disabled]="!logged" />
         </div>
-        <div class="h-full flex flex-column">
+        <div cdkDropListGroup class="h-full flex flex-column">
             <p-accordion [value]="['0', '1', '2', '3']" [multiple]="true" class="custom-acordion">
                 <p-accordion-panel value="0">
                     <p-accordion-header>Upload File</p-accordion-header>
@@ -15,17 +15,19 @@
                     </p-accordion-content>
                 </p-accordion-panel>
 
-                <p-accordion-panel value="3">
-                    <p-accordion-header>AI BoK Concept Matching</p-accordion-header>
-                    <p-accordion-content>
-                        <app-ai-bok-matching [pdfDoc]="pdfDoc" [pdfArrayBuffer]="pdfArrayBuffer" [(bokRelations)]="bokRelations"></app-ai-bok-matching>
-                    </p-accordion-content>
-                </p-accordion-panel>
-            
                 <p-accordion-panel value="1">
                     <p-accordion-header>Knowledge Annotated</p-accordion-header>
                     <p-accordion-content>
                         <app-annotate-document [concept]="concept" [(bokConcepts)]="bokRelations" [isPdfAvailable]="pdfDoc != null"></app-annotate-document>
+                    </p-accordion-content>
+                </p-accordion-panel>
+
+                <p-accordion-panel value="3">
+                    <p-accordion-header>
+                        AI Suggested BoK Concept            
+                    </p-accordion-header>
+                    <p-accordion-content>
+                        <app-ai-bok-matching [pdfDoc]="pdfDoc" [pdfArrayBuffer]="pdfArrayBuffer" [bokRelations]="bokRelations"></app-ai-bok-matching>
                     </p-accordion-content>
                 </p-accordion-panel>
             
@@ -46,5 +48,8 @@
     <p-divider class="hidden lg:flex my-3" layout="vertical" />
     <div class="flex-1 responsive-wrapper lg:mx-auto">
         <bok-visualization [(selectedConcept)]="concept" [showDescription]="false"> </bok-visualization>
+        <p class="m-0 mb-2 w-full text-center">
+            Browse and click "Add annotation" to manually add BoK concepts
+        </p>
     </div>
 </div>

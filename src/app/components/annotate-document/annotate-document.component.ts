@@ -1,14 +1,17 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BokInformationService } from '@eo4geo/ngx-bok-visualization';
-import { map, Observable, Subscription, take } from 'rxjs';
+import { map, Observable, take } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { ChipModule } from 'primeng/chip';
+import { CdkDropList, CdkDrag} from '@angular/cdk/drag-drop';
+import { MessageService } from 'primeng/api';
+
 
 @Component({
   standalone: true,
   selector: 'app-annotate-document',
-  imports: [CommonModule, ButtonModule, ChipModule],
+  imports: [CommonModule, ButtonModule, ChipModule, CdkDropList],
   templateUrl: './annotate-document.component.html',
   styleUrl: './annotate-document.component.css',
 })
@@ -17,9 +20,8 @@ export class AnnotateDocumentComponent {
   @Input() isPdfAvailable: boolean = false;
   @Input() bokConcepts: string[] = [];
   @Output() bokConceptsChange: EventEmitter<string[]> = new EventEmitter();
-  message: string = '';
 
-  constructor(private bokInfoService: BokInformationService) {}
+  constructor(private bokInfoService: BokInformationService, private messageService: MessageService) {}
 
   onClear() {
     this.bokConceptsChange.emit([]);
@@ -31,9 +33,13 @@ export class AnnotateDocumentComponent {
 
   addAnnotation() {
     if (this.bokConcepts.includes(this.concept)) {
-      this.message = 'Concept already included!';
-
-      setTimeout(() => (this.message = ''), 3000);
+      this.messageService.add({ 
+        severity: 'error', 
+        summary: 'Error', 
+        detail: 'Concept already included!',
+        life: 3000, 
+        closable: true 
+      }); 
     } else {
       this.bokConceptsChange.emit([...this.bokConcepts, this.concept]);
     }
@@ -73,5 +79,19 @@ export class AnnotateDocumentComponent {
     }
 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  suggestionDropped(item: CdkDrag<string>) {
+    if (this.bokConcepts.includes(item.data)) {
+      this.messageService.add({ 
+        severity: 'error', 
+        summary: 'Error', 
+        detail: 'Concept already included!',
+        life: 3000, 
+        closable: true 
+      }); 
+    } else {
+      this.bokConceptsChange.emit([...this.bokConcepts, item.data]);
+    }
   }
 }

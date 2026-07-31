@@ -17,6 +17,8 @@ import { StorageService } from '../../services/storage.service';
 import { Router } from '@angular/router';
 import { AuthService } from '@eo4geo/ngx-bok-utils';
 import { AiBokMatchingComponent } from '../ai-bok-matching/ai-bok-matching.component';
+import {CdkDropList, CdkDropListGroup} from '@angular/cdk/drag-drop';
+
 
 @Component({
   standalone: true,
@@ -34,7 +36,8 @@ import { AiBokMatchingComponent } from '../ai-bok-matching/ai-bok-matching.compo
     ButtonModule,
     DividerModule,
     ToastModule,
-    AiBokMatchingComponent
+    AiBokMatchingComponent,
+    CdkDropListGroup
   ],
   providers: [MessageService]
 })
