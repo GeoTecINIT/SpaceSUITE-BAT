@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, WritableSignal } from '@angular/core';
 import { UploadDocumentComponent } from '../upload-document/upload-document.component';
 import { BokComponent } from '@eo4geo/ngx-bok-visualization';
 import { AnnotateDocumentComponent } from '../annotate-document/annotate-document.component';
@@ -17,7 +17,7 @@ import { StorageService } from '../../services/storage.service';
 import { Router } from '@angular/router';
 import { AuthService } from '@eo4geo/ngx-bok-utils';
 import { AiBokMatchingComponent } from '../ai-bok-matching/ai-bok-matching.component';
-import {CdkDropList, CdkDropListGroup} from '@angular/cdk/drag-drop';
+import {CdkDrag, CdkDropList, CdkDropListGroup} from '@angular/cdk/drag-drop';
 
 
 @Component({
@@ -37,8 +37,9 @@ import {CdkDropList, CdkDropListGroup} from '@angular/cdk/drag-drop';
     DividerModule,
     ToastModule,
     AiBokMatchingComponent,
-    CdkDropListGroup
-  ],
+    CdkDropListGroup,
+    CdkDropList
+],
   providers: [MessageService]
 })
 export class MainPageComponent implements OnInit, OnDestroy {
@@ -50,6 +51,7 @@ export class MainPageComponent implements OnInit, OnDestroy {
   bokRelations: string[] = [];
 
   loading: boolean = false;
+  accordionPanels: WritableSignal<string[]> = signal(['0', '1', '2', '3']);
 
   private loggedSubscrition!: Subscription;
 
@@ -163,6 +165,12 @@ export class MainPageComponent implements OnInit, OnDestroy {
       }); 
     } else {
       this.pdfArrayBuffer = null;
+    }
+  }
+
+  openPanel(panelId: string) {
+    if (this.accordionPanels() && !this.accordionPanels().includes(panelId)) {
+      this.accordionPanels.update(value => [...value, panelId]);
     }
   }
 }

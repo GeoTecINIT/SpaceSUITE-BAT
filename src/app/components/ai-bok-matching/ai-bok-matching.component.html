@@ -9,7 +9,7 @@
     @if(!extractionProgress && modelLoadProgress == null && !processingProgress && !bokMatchingResult) {
         <div>
             <span>
-                AI automatically identify potential BoK concepts associated with your document. 
+                AI automatically identifies potential BoK concepts associated with your document. 
                 <i class="pi pi-info-circle" 
                     pTooltip="All processing is done locally in your browser. It may take some time."
                     tooltipPosition="right"
@@ -36,7 +36,7 @@
 
     <!-- Processing Progress -->
     <ng-container *ngIf="processingProgress">
-        <p class="m-0">Matching BoK | Block {{ processingProgress.current }}/{{ processingProgress.total }} ({{ calcPercent(processingProgress) }}%)</p>
+        <p class="m-0">Analyzing text | Block {{ processingProgress.current }}/{{ processingProgress.total }} ({{ calcPercent(processingProgress) }}%)</p>
         <p-progressbar [value]="calcPercent(processingProgress)" class="custom-progress-bar"/>
     </ng-container>
 
@@ -86,8 +86,8 @@
 
     <!-- Settings Section -->
     <div class="flex flex-row gap-3 mt-4 max-w-30rem">
-        <span class="text-sm font-medium vertical-align-top w-11rem">
-            Similarity Threshold: {{ similarityThreshold.toFixed(2) }}
+        <span class="text-sm font-medium vertical-align-top w-12rem">
+            Confidence Threshold: {{ similarityThreshold.toFixed(2) }}
         </span>
         <div class="flex flex-1 flex-column gap-2 mt-1">
             <p-slider [(ngModel)]="similarityThreshold" (ngModelChange)="onFilterChange()" min="0.5" max="1.0" step="0.01" 

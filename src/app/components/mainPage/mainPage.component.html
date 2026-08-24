@@ -7,7 +7,7 @@
                     icon="pi pi-file" (click)="navigateToMyDocs()" [disabled]="!logged" />
         </div>
         <div cdkDropListGroup class="h-full flex flex-column">
-            <p-accordion [value]="['0', '1', '2', '3']" [multiple]="true" class="custom-acordion">
+            <p-accordion [(value)]="accordionPanels" [multiple]="true" class="custom-acordion">
                 <p-accordion-panel value="0">
                     <p-accordion-header>Upload File</p-accordion-header>
                     <p-accordion-content>
@@ -16,7 +16,7 @@
                 </p-accordion-panel>
 
                 <p-accordion-panel value="1">
-                    <p-accordion-header>Knowledge Annotated</p-accordion-header>
+                    <p-accordion-header cdkDropList (cdkDropListEntered)="openPanel('1')" class="custom-drop-list">Knowledge Annotated</p-accordion-header>
                     <p-accordion-content>
                         <app-annotate-document [concept]="concept" [(bokConcepts)]="bokRelations" [isPdfAvailable]="pdfDoc != null"></app-annotate-document>
                     </p-accordion-content>
@@ -24,7 +24,7 @@
 
                 <p-accordion-panel value="3">
                     <p-accordion-header>
-                        AI Suggested BoK Concept            
+                        AI Suggested BoK Concepts            
                     </p-accordion-header>
                     <p-accordion-content>
                         <app-ai-bok-matching [pdfDoc]="pdfDoc" [pdfArrayBuffer]="pdfArrayBuffer" [bokRelations]="bokRelations"></app-ai-bok-matching>
@@ -48,8 +48,13 @@
     <p-divider class="hidden lg:flex my-3" layout="vertical" />
     <div class="flex-1 responsive-wrapper lg:mx-auto">
         <bok-visualization [(selectedConcept)]="concept" [showDescription]="false"> </bok-visualization>
-        <p class="m-0 mb-2 w-full text-center">
-            Browse and click "Add annotation" to manually add BoK concepts
+        <p class="m-0 mb-2 w-full text-center" [style.color]="pdfDoc ? '' : 'var(--danger-color)'">
+            @if(pdfDoc) {
+                Browse and click "Add annotation" to manually add BoK concepts
+            }
+            @else {
+                To begin annotating, upload a document or modify an existing one
+            }
         </p>
     </div>
 </div>

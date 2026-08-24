@@ -49,3 +49,9 @@
 .docs-button:hover {
     --p-button-text-primary-color: var(--hover-color);
 }
+
+.custom-drop-list {
+    .cdk-drag-placeholder {
+        display: none;
+    }
+}
