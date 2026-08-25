@@ -6,7 +6,7 @@
 }
 
 .responsive-wrapper {
-    max-width: calc(100vh * 0.85);
+    max-width: calc(100vh * 0.80);
 }
 
 @media (max-width: 991px) {

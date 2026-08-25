@@ -14,13 +14,6 @@
   <div class="flex flex-wrap gap-2">
     <p-button
       class="custom-button"
-      (click)="addAnnotation()"
-      [disabled]="!isPdfAvailable"
-    >
-      Add annotation
-    </p-button>
-    <p-button
-      class="custom-button"
       (click)="onClear()"
       [disabled]="!isPdfAvailable || bokConcepts.length == 0"
     >

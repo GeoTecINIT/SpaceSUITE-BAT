@@ -46,15 +46,25 @@
         </div>
     </div>
     <p-divider class="hidden lg:flex my-3" layout="vertical" />
-    <div class="flex-1 responsive-wrapper lg:mx-auto">
+    <div class="flex-1 mb-3 pb-2 responsive-wrapper lg:align-self-start lg:sticky lg:top-0 lg:mx-auto">
         <bok-visualization [(selectedConcept)]="concept" [showDescription]="false"> </bok-visualization>
-        <p class="m-0 mb-2 w-full text-center" [style.color]="pdfDoc ? '' : 'var(--danger-color)'">
-            @if(pdfDoc) {
-                Browse and click "Add annotation" to manually add BoK concepts
-            }
-            @else {
-                To begin annotating, upload a document or modify an existing one
-            }
-        </p>
+        <div class="flex flex-wrap gap-1 mb-3 justify-content-center">
+            <span class="white-space-nowrap font-bold">Selected concept: </span>
+            <span class="max-w-25rem white-space-nowrap overflow-hidden text-overflow-ellipsis">{{conceptName() | async}} </span>
+            <span>({{concept}})</span>
+        </div>
+        <div class="flex align-items-center justify-content-center flex-nowrap gap-3">
+            <p class="m-0 text-center" [style.color]="pdfDoc ? '' : 'var(--danger-color)'">
+                @if(pdfDoc) {
+                    Browse and click "Add annotation" to manually add BoK concepts
+                }
+                @else {
+                    To begin annotating, upload a document or modify an existing one
+                }
+            </p>
+            <p-button class="custom-button" [size]="'small'" (click)="addAnnotation()" [disabled]="!pdfDoc">
+                Add annotation
+            </p-button>
+        </div>
     </div>
 </div>

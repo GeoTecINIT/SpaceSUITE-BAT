@@ -31,20 +31,6 @@ export class AnnotateDocumentComponent {
     this.bokConceptsChange.emit(this.bokConcepts.filter((item) => item !== concept));
   }
 
-  addAnnotation() {
-    if (this.bokConcepts.includes(this.concept)) {
-      this.messageService.add({ 
-        severity: 'error', 
-        summary: 'Error', 
-        detail: 'Concept already included!',
-        life: 3000, 
-        closable: true 
-      }); 
-    } else {
-      this.bokConceptsChange.emit([...this.bokConcepts, this.concept]);
-    }
-  }
-
   getBackgroundColor(concept: string): Observable<string> {
     return this.bokInfoService.getConceptColor(concept).pipe(
       take(1),

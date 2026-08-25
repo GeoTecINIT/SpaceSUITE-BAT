@@ -1,11 +1,11 @@
 import { Component, OnInit, OnDestroy, signal, WritableSignal } from '@angular/core';
 import { UploadDocumentComponent } from '../upload-document/upload-document.component';
-import { BokComponent } from '@eo4geo/ngx-bok-visualization';
+import { BokComponent, BokInformationService } from '@eo4geo/ngx-bok-visualization';
 import { AnnotateDocumentComponent } from '../annotate-document/annotate-document.component';
 import { PDFDocument } from 'pdf-lib';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { catchError, finalize, of, Subscription } from 'rxjs';
+import { catchError, finalize, Observable, of, Subscription } from 'rxjs';
 import { AccordionModule } from 'primeng/accordion';
 import { ButtonModule } from 'primeng/button';
 import { DividerModule } from 'primeng/divider';
@@ -17,7 +17,7 @@ import { StorageService } from '../../services/storage.service';
 import { Router } from '@angular/router';
 import { AuthService } from '@eo4geo/ngx-bok-utils';
 import { AiBokMatchingComponent } from '../ai-bok-matching/ai-bok-matching.component';
-import {CdkDrag, CdkDropList, CdkDropListGroup} from '@angular/cdk/drag-drop';
+import { CdkDropList, CdkDropListGroup} from '@angular/cdk/drag-drop';
 
 
 @Component({
@@ -59,7 +59,8 @@ export class MainPageComponent implements OnInit, OnDestroy {
     private storageService: StorageService,
     private messageService: MessageService,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private bokService: BokInformationService
   ) {}
 
   ngOnInit() {
@@ -172,5 +173,23 @@ export class MainPageComponent implements OnInit, OnDestroy {
     if (this.accordionPanels() && !this.accordionPanels().includes(panelId)) {
       this.accordionPanels.update(value => [...value, panelId]);
     }
+  }
+
+  addAnnotation() {
+    if (this.bokRelations.includes(this.concept)) {
+      this.messageService.add({ 
+        severity: 'error', 
+        summary: 'Error', 
+        detail: 'Concept already included!',
+        life: 3000, 
+        closable: true 
+      }); 
+    } else {
+      this.bokRelations = [...this.bokRelations, this.concept];
+    }
+  }
+
+  conceptName(): Observable<string> {
+    return this.bokService.getConceptName(this.concept)
   }
 }
