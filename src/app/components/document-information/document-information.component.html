@@ -1,6 +1,5 @@
 <div class="flex flex-column gap-4 my-2">
-  <div class="flex gap-4 sm:gap-2 flex-column-reverse sm:flex-row">
-    <p-floatlabel variant="on" class="custom-floatlabel flex-1">
+  <p-floatlabel variant="on" class="custom-floatlabel">
       <p-iconfield>
         <p-inputicon class="pi pi-pencil" />
         <input pInputText id="name" autocomplete="off" class="w-full custom-input" 
@@ -8,9 +7,6 @@
         </p-iconfield>
         <label for="name">Name*</label>
     </p-floatlabel>
-    <p-selectbutton [options]="stateOptions" [(ngModel)]="formData.publicFile" optionLabel="label" optionValue="value" 
-                    [disabled]="!logged || !isPdfAvailable" (ngModelChange)="updateDocumentForm()"/>
-  </div>
 
   <p-floatlabel variant="on" class="custom-floatlabel">
       <p-iconfield class="textarea-iconfield">

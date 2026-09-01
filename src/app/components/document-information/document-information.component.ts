@@ -6,7 +6,6 @@ import { IconFieldModule } from "primeng/iconfield";
 import { InputTextModule } from "primeng/inputtext";
 import { FloatLabelModule } from "primeng/floatlabel";
 import { TextareaModule } from 'primeng/textarea';
-import { SelectButtonModule } from 'primeng/selectbutton';
 import { SelectModule } from 'primeng/select';
 import { BehaviorSubject, Subscription, take } from 'rxjs';
 import { DocumentForm } from '../../model/documentForm';
@@ -15,7 +14,7 @@ import { UserInformationService } from '../../services/userInformation.service';
 @Component({
   standalone: true,
   selector: 'app-document-information',
-  imports: [CommonModule, FormsModule, InputIconModule, IconFieldModule, InputTextModule, FloatLabelModule, TextareaModule, SelectButtonModule, SelectModule],
+  imports: [CommonModule, FormsModule, InputIconModule, IconFieldModule, InputTextModule, FloatLabelModule, TextareaModule, SelectModule],
   templateUrl: './document-information.component.html',
   styleUrl: './document-information.component.css',
 })
@@ -26,8 +25,6 @@ export class DocumentInformationComponent {
   @Input() formData: DocumentForm = new DocumentForm();
   @Output() formDataChange = new BehaviorSubject<DocumentForm>(this.formData);
   
-  stateOptions: any[] = [{ label: 'Public', value: true },{ label: 'Private', value: false }];
-
   organizations: {_id: string, name: string}[] = [];
   selectedOrganization: {_id: string, name: string} | null = null;
 
