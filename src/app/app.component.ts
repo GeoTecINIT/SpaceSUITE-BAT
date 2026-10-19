@@ -23,7 +23,7 @@ export class AppComponent {
         {
           label: 'BoK Visualization & Search',
           icon: 'pi pi-search',
-          url: 'https://bok.eo4geo.eu',
+          url: 'https://geospacebok.eu/',
           target: '_blank'
         },
         {
