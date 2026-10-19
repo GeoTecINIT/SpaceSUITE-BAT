@@ -29,13 +29,13 @@ export class AppComponent {
         {
           label: 'Occupational Profile Tool',
           icon: 'pi pi-users',
-          url: 'https://eo4geo-opt.web.app',
+          url: 'https://spacesuite-occupational-profile-tool.web.app',
           target: '_blank'
         },
         {
           label: 'Job Offer Tool',
           icon: 'pi pi-book',
-          url: 'https://eo4geo-jot.web.app',
+          url: 'https://spacesuite-job-offer-tool.web.app',
           target: '_blank'
         },
         {
@@ -47,13 +47,13 @@ export class AppComponent {
         {
           label: 'Training Catalogue',
           icon: 'pi pi-graduation-cap',
-          url: 'https://spacesuite-project-tct.web.app/',
+          url: 'https://spacesuite-training-catalogue.web.app/',
           target: '_blank'
         },
         {
           label: 'Skill Portfolio',
           icon: 'pi pi-user',
-          url: 'https://spacesuite-project-spt.web.app',
+          url: 'https://spacesuite-skill-portfolio.web.app',
           target: '_blank'
         },
         {
