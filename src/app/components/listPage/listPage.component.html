@@ -16,7 +16,6 @@
                 <div class="flex justify-content-between gap-3" style="padding-left: 1.25rem; padding-right: 1.25rem; padding-top: 1.25rem;">
                     <div class="flex align-items-center gap-2 min-w-0">
                         <div class="p-card-title white-space-nowrap overflow-hidden text-overflow-ellipsis">{{document.name}}</div>
-                        <i class="p-1" [ngClass]="document.isPublic ? 'pi pi-lock-open' : 'pi pi-lock'"></i>
                     </div>
                     <div class="flex gap-1">
                         <p-button class="flex pencil-button" variant="text" rounded="true" size="large" icon="pi pi-pencil" (click)="editDocumentAnnotation(document._id)"/>
